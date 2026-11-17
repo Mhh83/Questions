@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سامانه هوشمند طراحی آزمون و برگه امتحانی توصیفی</title>
+    <!-- بارگذاری فونت وزیرمتن از گوگل فونتس برای نمایش زیبا و استاندارد متون فارسی -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- بارگذاری تیلویند CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- بارگذاری آیکون‌های Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- بارگذاری کتابخانه html2pdf برای دانلود مستقیم PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Vazirmatn', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* تنظیمات پایه و فونت */
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+            overflow-x: hidden;
+        }
+
+        /* استایل برگه A4 در حالت پیش‌نمایش */
+        .a4-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            margin: 0 auto;
+            padding: 15mm;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        /* خطوط نقطه‌چین یا خط‌کشی برای فضای پاسخ‌دهی تشریحی */
+        .answer-lines {
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent,
+                transparent 27px,
+                #cbd5e1 28px
+            );
+            width: 100%;
+        }
+
+        /* اسکرول‌بار سفارشی زیبا */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* قوانین حیاتی برای چاپ و خروجی PDF */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 10mm;
+            }
+            body {
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+            .a4-sheet {
+                width: 100% !important;
+                min-height: auto !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 5mm !important;
+                border: none !important;
+            }
+            /* جلوگیری از نصف شدن سوالات یا ردیف‌های جدول در مرز صفحات چاپ */
+            .question-block, tr, .descriptive-section {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- نوار ابزار بالایی (Header) -->
+    <header class="no-print bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3 z-20 shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 text-white p-2 rounded-xl shadow-sm">
+                <i data-lucide="file-check-2" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg text-slate-800 leading-tight">طراح هوشمند آزمون توصیفی</h1>
+                <p class="text-xs text-slate-500">ساخت برگه امتحانی استاندارد همراه با جدول ارزشیابی توصیفی</p>
+            </div>
+        </div>
+
+        <!-- نشانگر وضعیت و دکمه‌های عملیاتی -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-xl text-sm font-semibold flex items-center gap-2">
+                <i data-lucide="award" class="w-4 h-4 text-emerald-600"></i>
+                <span>ارزشیابی توصیفی</span>
+            </div>
+
+            <!-- دکمه تغییر حالت نمایش در موبایل/تبلت -->
+            <button id="toggle-view-btn" onclick="toggleMobileView()" class="lg:hidden flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-sm font-medium transition">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+                <span id="toggle-view-text">مشاهده پیش‌نمایش</span>
+            </button>
+
+            <button onclick="resetToSample()" title="بازنشانی به نمونه اولیه" class="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-sm font-medium transition">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">نمونه پیش‌فرض</span>
+            </button>
+
+            <button onclick="downloadPDF()" id="pdf-btn" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-sm font-medium shadow-sm transition">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>دانلود PDF</span>
+            </button>
+
+            <button onclick="window.print()" class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                <span>چاپ / ذخیره PDF</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- بدنه اصلی برنامه (دو ستونه در دسکتاپ: راست پنل ویرایش، چپ پیش‌نمایش برگه A4) -->
+    <main class="flex-1 flex overflow-hidden relative">
+        
+        <!-- پنل سمت راست: ابزارهای طراحی و ویرایش -->
+        <aside id="editor-panel" class="no-print w-full lg:w-[460px] xl:w-[500px] bg-white border-l border-slate-200 flex flex-col h-full overflow-hidden z-10">
+            
+            <!-- تب‌های ناوبری ویرایشگر -->
+            <div class="flex border-b border-slate-200 bg-slate-50 p-1.5 gap-1">
+                <button onclick="switchTab('header')" id="tab-btn-header" class="tab-btn flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition bg-white text-blue-600 shadow-sm">
+                    <i data-lucide="layout-template" class="w-4 h-4"></i>
+                    <span>سربرگ و تنظیمات</span>
+                </button>
+                <button onclick="switchTab('questions')" id="tab-btn-questions" class="tab-btn flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition text-slate-600 hover:bg-slate-200/60">
+                    <i data-lucide="list-checks" class="w-4 h-4"></i>
+                    <span>سوالات آزمون</span>
+                </button>
+                <button onclick="switchTab('descriptive')" id="tab-btn-descriptive" class="tab-btn flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition text-slate-600 hover:bg-slate-200/60">
+                    <i data-lucide="award" class="w-4 h-4"></i>
+                    <span>جدول توصیفی</span>
+                </button>
+            </div>
+
+            <!-- محتوای قابل اسکرول تب‌ها -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-5">
+
+                <!-- تب ۱: تنظیمات سربرگ و فاصله‌گذاری کلی -->
+                <div id="tab-content-header" class="space-y-4">
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3">
+                        <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-2">
+                            <i data-lucide="school" class="w-4 h-4 text-blue-600"></i>
+                            اطلاعات سربرگ برگه امتحانی
+                        </h2>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-medium text-slate-600 mb-1">عبارت بالای صفحه (نام خدا)</label>
+                                <input type="text" id="inp-bismillah" oninput="updateExamMeta()" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-medium text-slate-600 mb-1">نام مدرسه / آموزشگاه</label>
+                                <input type="text" id="inp-school" oninput="updateExamMeta()" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">عنوان آزمون</label>
+                                <input type="text" id="inp-title" oninput="updateExamMeta()" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">نام درس</label>
+                                <input type="text" id="inp-subject" oninput="updateExamMeta()" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">پایه / کلاس</label>
+                                <input type="text" id="inp-grade" oninput="updateExamMeta()" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">نام آموزگار / دبیر</label>
+                                <input type="text" id="inp-teacher" oninput="updateExamMeta()" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">تاریخ آزمون</label>
+                                <input type="text" id="inp-date" oninput="updateExamMeta()" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">مدت زمان پاسخ‌گویی</label>
+                                <input type="text" id="inp-duration" oninput="updateExamMeta()" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="pt-2 flex flex-col gap-2.5 border-t border-slate-200">
+                            <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                                <input type="checkbox" id="chk-seat-number" onchange="updateExamMeta()" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                <span>نمایش فیلد نام پدر و شماره صندلی/کلاس در سربرگ</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                                <input type="checkbox" id="chk-question-eval" onchange="updateExamMeta()" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                <span>نمایش کادر سطح عملکرد توصیفی کنار هر سوال</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- بخش تنظیمات فاصله‌گذاری و ظاهر برگه -->
+                    <div class="bg-blue-50/60 p-4 rounded-2xl border border-blue-200/80 space-y-4">
+                        <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-blue-200 pb-2">
+                            <i data-lucide="sliders" class="w-4 h-4 text-blue-600"></i>
+                            تنظیمات فاصله‌گذاری و ظاهر سوالات
+                        </h2>
+
+                        <div>
+                            <div class="flex justify-between text-xs font-medium text-slate-700 mb-1.5">
+                                <span>فاصله پایه بین تمام سوالات:</span>
+                                <span id="global-spacing-val" class="font-bold text-blue-600 bg-white px-2 py-0.5 rounded-md border border-blue-200">16 پیکسل</span>
+                            </div>
+                            <input type="range" id="inp-global-spacing" min="4" max="80" step="2" value="16" oninput="updateGlobalSettings()" class="w-full accent-blue-600 cursor-pointer">
+                            <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                                <span>فشرده (۴px)</span>
+                                <span>متوسط (۴۰px)</span>
+                                <span>زیاد (۸۰px)</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1.5">سبک فضای خالی پاسخ‌دهی زیر سوالات:</label>
+                            <select id="inp-line-style" onchange="updateGlobalSettings()" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="blank">فضای سفید بدون خط (مناسب محاسبات و رسم)</option>
+                                <option value="lined">خط‌چین راهنما برای نوشتن پاسخ</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs font-medium text-slate-700 mb-1.5">
+                                <span>اندازه فونت متن سوالات:</span>
+                                <span id="font-size-val" class="font-bold text-blue-600 bg-white px-2 py-0.5 rounded-md border border-blue-200">13 پیکسل</span>
+                            </div>
+                            <input type="range" id="inp-font-size" min="11" max="17" step="1" value="13" oninput="updateGlobalSettings()" class="w-full accent-blue-600 cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- تب ۲: طراحی و مدیریت سوالات -->
+                <div id="tab-content-questions" class="hidden space-y-4">
+                    <!-- دکمه‌های افزودن سوال جدید -->
+                    <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                        <p class="text-xs font-semibold text-slate-600 mb-2">افزودن سوال جدید:</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <button onclick="addQuestion('descriptive')" class="flex flex-col items-center justify-center gap-1 bg-white hover:bg-blue-50 hover:border-blue-300 text-slate-700 border border-slate-200 p-2.5 rounded-xl text-xs font-medium transition shadow-sm">
+                                <i data-lucide="align-right" class="w-4 h-4 text-blue-600"></i>
+                                <span>تشریحی</span>
+                            </button>
+                            <button onclick="addQuestion('mcq')" class="flex flex-col items-center justify-center gap-1 bg-white hover:bg-emerald-50 hover:border-emerald-300 text-slate-700 border border-slate-200 p-2.5 rounded-xl text-xs font-medium transition shadow-sm">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>
+                                <span>چهارگزینه‌ای</span>
+                            </button>
+                            <button onclick="addQuestion('blank')" class="flex flex-col items-center justify-center gap-1 bg-white hover:bg-amber-50 hover:border-amber-300 text-slate-700 border border-slate-200 p-2.5 rounded-xl text-xs font-medium transition shadow-sm">
+                                <i data-lucide="minus-square" class="w-4 h-4 text-amber-600"></i>
+                                <span>جای خالی</span>
+                            </button>
+                            <button onclick="addQuestion('tf')" class="flex flex-col items-center justify-center gap-1 bg-white hover:bg-purple-50 hover:border-purple-300 text-slate-700 border border-slate-200 p-2.5 rounded-xl text-xs font-medium transition shadow-sm">
+                                <i data-lucide="help-circle" class="w-4 h-4 text-purple-600"></i>
+                                <span>صحیح / غلط</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- لیست کارت‌های سوالات برای ویرایش -->
+                    <div id="questions-editor-list" class="space-y-3">
+                        <!-- کارت‌های سوال به صورت پویا اینجا رندر می‌شوند -->
+                    </div>
+                </div>
+
+                <!-- تب ۳: جدول عملکرد توصیفی -->
+                <div id="tab-content-descriptive" class="hidden space-y-4">
+                    <div class="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-200 flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-sm text-emerald-950">جدول ارزشیابی توصیفی پایان برگه</h3>
+                            <p class="text-xs text-emerald-700 mt-0.5">نمایش جدول بررسی اهداف آموزشی و سطح عملکرد دانش‌آموز</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="chk-enable-descriptive" checked onchange="toggleDescriptiveTable()" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                        </label>
+                    </div>
+
+                    <div id="descriptive-controls-wrapper" class="space-y-4">
+                        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">عنوان جدول ارزشیابی</label>
+                                <input type="text" id="inp-desc-title" oninput="updateDescriptiveMeta()" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+
+                            <div class="flex items-center justify-between pt-1">
+                                <span class="text-xs font-bold text-slate-700">مباحث و انتظارات آموزشی:</span>
+                                <button onclick="addDescriptiveRow()" class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-medium transition">
+                                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                                    <span>افزودن ردیف مبحث</span>
+                                </button>
+                            </div>
+
+                            <div id="descriptive-rows-list" class="space-y-2.5">
+                                <!-- ردیف‌های جدول توصیفی اینجا رندر می‌شوند -->
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">متن جمع‌بندی و نظر نهایی معلم (اختیاری - قابل پر کردن دستی پس از چاپ)</label>
+                                <textarea id="inp-desc-summary" rows="2" oninput="updateDescriptiveMeta()" placeholder="مثال: دانش‌آموز در حل مسائل دقت خوبی داشته اما نیاز به تمرین بیشتر در جدول ضرب دارد..." class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+                            </div>
+                            <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                                <input type="checkbox" id="chk-signatures" checked onchange="updateDescriptiveMeta()" class="w-4 h-4 text-blue-600 rounded">
+                                <span>نمایش کادر امضای معلم و ولی دانش‌آموز در انتهای برگه</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- پنل سمت چپ: پیش‌نمایش زنده برگه امتحانی A4 -->
+        <section id="preview-panel" class="print-container hidden lg:block flex-1 bg-slate-200/80 overflow-y-auto p-4 sm:p-8">
+            <div class="max-w-[210mm] mx-auto mb-3 no-print flex items-center justify-between text-xs text-slate-600 px-1">
+                <span class="flex items-center gap-1.5 font-medium">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    پیش‌نمایش زنده برگه استاندارد A4
+                </span>
+                <span>تغییرات به صورت آنی اعمال می‌شوند</span>
+            </div>
+
+            <!-- برگه واقعی A4 که خروجی چاپ و PDF از آن گرفته می‌شود -->
+            <div id="exam-paper" class="a4-sheet text-slate-900">
+                <!-- محتوای برگه از طریق جاوااسکریپت رندر می‌شود -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- کادر پیام (Toast Notification) جایگزین alert -->
+    <div id="toast-box" class="no-print fixed bottom-5 left-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl text-sm font-medium flex items-center gap-2.5 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <i data-lucide="info" class="w-4 h-4 text-blue-400"></i>
+        <span id="toast-message">پیام سیستم</span>
+    </div>
+
+    <script>
+        // وضعیت اولیه و داده‌های نمونه برنامه (بدون سیستم نمره‌دهی و کاملاً توصیفی)
+        const defaultState = {
+            meta: {
+                bismillah: 'به نام خداوند جان و خرد',
+                school: 'دبستان هوشمند علامه حلی',
+                title: 'آزمون ارزشیابی توصیفی نوبت اول',
+                subject: 'ریاضی و هندسه',
+                grade: 'پایه ششم - کلاس الف',
+                teacher: 'آموزگار محمدی',
+                date: '۱۴۰۵/۰۸/۲۶',
+                duration: '۶۰ دقیقه',
+                showSeatNumber: true,
+                showQuestionEval: false
+            },
+            settings: {
+                globalSpacing: 16,
+                lineStyle: 'lined',
+                fontSize: 13
+            },
+            questions: [
+                {
+                    id: 'q1',
+                    type: 'descriptive',
+                    text: 'حاصل عبارت‌های زیر را با نوشتن مراحل کامل راه‌حل به دست آورید:\nالف) (۳/۴ + ۱/۲) × ۲/۵ =\nب) اگر محیط یک مربع ۲۴ سانتی‌متر باشد، مساحت آن چقدر است؟',
+                    skill: 'محاسبه کسرها و مساحت',
+                    extraSpace: 85,
+                    image: null,
+                    options: []
+                },
+                {
+                    id: 'q2',
+                    type: 'mcq',
+                    text: 'کدام یک از کسرهای زیر بزرگ‌تر از واحد (۱) است؟',
+                    skill: 'مقایسه کسرها',
+                    extraSpace: 10,
+                    image: null,
+                    options: ['۳/۴', '۵/۵', '۷/۶', '۲/۹']
+                },
+                {
+                    id: 'q3',
+                    type: 'blank',
+                    text: 'جاهای خالی را با کلمات یا اعداد مناسب کامل کنید:\nالف) به زاویه‌ای که اندازه‌ی آن دقیقاً ۹۰ درجه باشد، زاویه ................... می‌گویند.\nب) حاصل ضرب هر عدد در صفر برابر با ................... است.',
+                    skill: 'مفاهیم پایه هندسه و اعداد',
+                    extraSpace: 15,
+                    image: null,
+                    options: []
+                },
+                {
+                    id: 'q4',
+                    type: 'tf',
+                    text: 'درستی یا نادرستی عبارت‌های زیر را با علامت (✓) مشخص کنید:\nالف) مجموع زوایای داخلی هر مثلث برابر با ۱۸۰ درجه است.\nب) عدد ۱ یک عدد اول محسوب می‌شود.',
+                    skill: 'استدلال منطقی و هندسی',
+                    extraSpace: 10,
+                    image: null,
+                    options: []
+                },
+                {
+                    id: 'q5',
+                    type: 'descriptive',
+                    text: 'مسئله: یک باغچه مستطیل‌شکل به طول ۱۲ متر و عرض ۸ متر داریم. اگر بخواهیم دور تا دور این باغچه را حصار بکشیم و هزینه هر متر حصار ۵۰,۰۰۰ تومان باشد، کل هزینه حصارکشی چقدر می‌شود؟',
+                    skill: 'حل مسئله کاربردی',
+                    extraSpace: 110,
+                    image: null,
+                    options: []
+                }
+            ],
+            descriptive: {
+                enabled: true,
+                title: 'جدول ارزشیابی توصیفی و تحلیل عملکرد دانش‌آموز در مباحث آزمون',
+                rows: [
+                    {
+                        id: 'd1',
+                        objective: 'دانش‌آموز توانسته عملیات جمع و ضرب کسرها را به درستی انجام دهد.',
+                        level: '',
+                        comment: ''
+                    },
+                    {
+                        id: 'd2',
+                        objective: 'دانش‌آموز مفاهیم اولیه هندسه (محیط، مساحت و انواع زاویه) را درک کرده است.',
+                        level: '',
+                        comment: ''
+                    },
+                    {
+                        id: 'd3',
+                        objective: 'دانش‌آموز توانایی تحلیل مسائل کلامی و ارائه راه‌حل مرحله‌به‌مرحله را دارد.',
+                        level: '',
+                        comment: ''
+                    }
+                ],
+                summary: '',
+                showSignatures: true
+            }
+        };
+
+        // کلید جدید در localStorage تا با نسخه قبلی تداخل نداشته باشد
+        const STORAGE_KEY = 'descriptive_exam_builder_v2';
+
+        let appState = JSON.parse(JSON.stringify(defaultState));
+        let isMobilePreview = false;
+
+        // بارگذاری اطلاعات ذخیره‌شده از حافظه مرورگر در صورت وجود
+        function loadFromStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && parsed.meta && parsed.questions && parsed.descriptive) {
+                        appState = parsed;
+                    }
+                }
+            } catch (e) {
+                console.warn('خطا در بازیابی اطلاعات از حافظه مرورگر:', e);
+            }
+        }
+
+        // ذخیره خودکار تغییرات در مرورگر
+        function saveToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+            } catch (e) {
+                console.warn('خطا در ذخیره‌سازی اطلاعات:', e);
+            }
+        }
+
+        // نمایش پیام اطلاع‌رسانی بدون استفاده از alert
+        function showToast(msg) {
+            const box = document.getElementById('toast-box');
+            const msgEl = document.getElementById('toast-message');
+            if (!box || !msgEl) return;
+            msgEl.textContent = msg;
+            box.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                box.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // تبدیل اعداد انگلیسی به فارسی برای نمایش زیباتر در برگه
+        function toPersianDigits(num) {
+            if (num === null || num === undefined) return '';
+            const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+            return num.toString().replace(/\d/g, x => persianDigits[x]);
+        }
+
+        // فرار از کاراکترهای خطرناک HTML در ورودی‌های متنی
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // بازنشانی به نمونه پیش‌فرض
+        function resetToSample() {
+            appState = JSON.parse(JSON.stringify(defaultState));
+            saveToStorage();
+            populateInputsFromState();
+            renderQuestionsEditor();
+            renderDescriptiveEditor();
+            renderPaper();
+            showToast('برگه آزمون به نمونه پیش‌فرض بازنشانی شد.');
+        }
+
+        // جابه‌جایی بین تب‌های ویرایشگر
+        function switchTab(tabName) {
+            ['header', 'questions', 'descriptive'].forEach(t => {
+                const content = document.getElementById(`tab-content-${t}`);
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (t === tabName) {
+                    content.classList.remove('hidden');
+                    btn.classList.add('bg-white', 'text-blue-600', 'shadow-sm');
+                    btn.classList.remove('text-slate-600');
+                } else {
+                    content.classList.add('hidden');
+                    btn.classList.remove('bg-white', 'text-blue-600', 'shadow-sm');
+                    btn.classList.add('text-slate-600');
+                }
+            });
+        }
+
+        // تغییر حالت نمایش در صفحات موبایل و تبلت
+        function toggleMobileView() {
+            isMobilePreview = !isMobilePreview;
+            const editor = document.getElementById('editor-panel');
+            const preview = document.getElementById('preview-panel');
+            const btnText = document.getElementById('toggle-view-text');
+
+            if (isMobilePreview) {
+                editor.classList.add('hidden');
+                preview.classList.remove('hidden');
+                btnText.textContent = 'بازگشت به ویرایش';
+            } else {
+                editor.classList.remove('hidden');
+                preview.classList.add('hidden');
+                btnText.textContent = 'مشاهده پیش‌نمایش';
+            }
+        }
+
+        // مقداردهی اولیه فرم‌ها از روی state
+        function populateInputsFromState() {
+            document.getElementById('inp-bismillah').value = appState.meta.bismillah || '';
+            document.getElementById('inp-school').value = appState.meta.school || '';
+            document.getElementById('inp-title').value = appState.meta.title || '';
+            document.getElementById('inp-subject').value = appState.meta.subject || '';
+            document.getElementById('inp-grade').value = appState.meta.grade || '';
+            document.getElementById('inp-teacher').value = appState.meta.teacher || '';
+            document.getElementById('inp-date').value = appState.meta.date || '';
+            document.getElementById('inp-duration').value = appState.meta.duration || '';
+            document.getElementById('chk-seat-number').checked = !!appState.meta.showSeatNumber;
+            document.getElementById('chk-question-eval').checked = !!appState.meta.showQuestionEval;
+
+            document.getElementById('inp-global-spacing').value = appState.settings.globalSpacing;
+            document.getElementById('global-spacing-val').textContent = appState.settings.globalSpacing + ' پیکسل';
+            document.getElementById('inp-line-style').value = appState.settings.lineStyle;
+            document.getElementById('inp-font-size').value = appState.settings.fontSize;
+            document.getElementById('font-size-val').textContent = appState.settings.fontSize + ' پیکسل';
+
+            document.getElementById('chk-enable-descriptive').checked = !!appState.descriptive.enabled;
+            document.getElementById('inp-desc-title').value = appState.descriptive.title || '';
+            document.getElementById('inp-desc-summary').value = appState.descriptive.summary || '';
+            document.getElementById('chk-signatures').checked = !!appState.descriptive.showSignatures;
+            toggleDescriptiveControlsVisibility();
+        }
+
+        // به‌روزرسانی اطلاعات سربرگ
+        function updateExamMeta() {
+            appState.meta.bismillah = document.getElementById('inp-bismillah').value;
+            appState.meta.school = document.getElementById('inp-school').value;
+            appState.meta.title = document.getElementById('inp-title').value;
+            appState.meta.subject = document.getElementById('inp-subject').value;
+            appState.meta.grade = document.getElementById('inp-grade').value;
+            appState.meta.teacher = document.getElementById('inp-teacher').value;
+            appState.meta.date = document.getElementById('inp-date').value;
+            appState.meta.duration = document.getElementById('inp-duration').value;
+            appState.meta.showSeatNumber = document.getElementById('chk-seat-number').checked;
+            appState.meta.showQuestionEval = document.getElementById('chk-question-eval').checked;
+            saveToStorage();
+            renderPaper();
+        }
+
+        // به‌روزرسانی تنظیمات کلی فاصله و فونت
+        function updateGlobalSettings() {
+            const spacing = parseInt(document.getElementById('inp-global-spacing').value, 10);
+            const lineStyle = document.getElementById('inp-line-style').value;
+            const fontSize = parseInt(document.getElementById('inp-font-size').value, 10);
+
+            appState.settings.globalSpacing = spacing;
+            appState.settings.lineStyle = lineStyle;
+            appState.settings.fontSize = fontSize;
+
+            document.getElementById('global-spacing-val').textContent = spacing + ' پیکسل';
+            document.getElementById('font-size-val').textContent = fontSize + ' پیکسل';
+            saveToStorage();
+            renderPaper();
+        }
+
+        // افزودن سوال جدید
+        function addQuestion(type) {
+            const id = 'q_' + Date.now();
+            let newQ = {
+                id,
+                type,
+                text: '',
+                skill: '',
+                extraSpace: type === 'descriptive' ? 70 : 12,
+                image: null,
+                options: []
+            };
+
+            if (type === 'descriptive') {
+                newQ.text = 'متن سوال تشریحی خود را اینجا بنویسید...';
+            } else if (type === 'mcq') {
+                newQ.text = 'متن سوال چهارگزینه‌ای را اینجا بنویسید:';
+                newQ.options = ['گزینه اول', 'گزینه دوم', 'گزینه سوم', 'گزینه چهارم'];
+            } else if (type === 'blank') {
+                newQ.text = 'جمله دارای جای خالی را بنویسید: .................';
+            } else if (type === 'tf') {
+                newQ.text = 'درستی یا نادرستی عبارت زیر را مشخص کنید:\nالف) عبارت نمونه اول';
+            }
+
+            appState.questions.push(newQ);
+            saveToStorage();
+            renderQuestionsEditor();
+            renderPaper();
+            showToast('سوال جدید به آزمون اضافه شد.');
+        }
+
+        // حذف سوال
+        function deleteQuestion(index) {
+            appState.questions.splice(index, 1);
+            saveToStorage();
+            renderQuestionsEditor();
+            renderPaper();
+            showToast('سوال حذف شد.');
+        }
+
+        // جابه‌جایی ترتیب سوال به بالا یا پایین
+        function moveQuestion(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= appState.questions.length) return;
+            const temp = appState.questions[index];
+            appState.questions[index] = appState.questions[newIndex];
+            appState.questions[newIndex] = temp;
+            saveToStorage();
+            renderQuestionsEditor();
+            renderPaper();
+        }
+
+        // به‌روزرسانی فیلدهای یک سوال خاص
+        function updateQuestionField(index, field, value) {
+            appState.questions[index][field] = value;
+            if (field === 'extraSpace') {
+                const label = document.getElementById(`space-label-${index}`);
+                if (label) label.textContent = value + ' پیکسل';
+            }
+            saveToStorage();
+            renderPaper();
+        }
+
+        // تغییر گام‌به‌گام فضای زیر سوال با دکمه + و -
+        function changeQuestionSpace(index, delta) {
+            let current = appState.questions[index].extraSpace || 0;
+            let next = Math.max(0, Math.min(260, current + delta));
+            appState.questions[index].extraSpace = next;
+            saveToStorage();
+            renderQuestionsEditor();
+            renderPaper();
+        }
+
+        // به‌روزرسانی گزینه‌های سوال تستی
+        function updateQuestionOption(qIndex, optIndex, value) {
+            appState.questions[qIndex].options[optIndex] = value;
+            saveToStorage();
+            renderPaper();
+        }
+
+        // بارگذاری تصویر برای سوال
+        function handleImageUpload(index, event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                appState.questions[index].image = e.target.result;
+                saveToStorage();
+                renderQuestionsEditor();
+                renderPaper();
+                showToast('تصویر به سوال اضافه شد.');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // حذف تصویر سوال
+        function removeQuestionImage(index) {
+            appState.questions[index].image = null;
+            saveToStorage();
+            renderQuestionsEditor();
+            renderPaper();
+        }
+
+        // رندر کردن لیست سوالات در پنل ویرایشگر
+        function renderQuestionsEditor() {
+            const container = document.getElementById('questions-editor-list');
+            container.innerHTML = '';
+
+            if (appState.questions.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-slate-500 text-xs">
+                        هنوز سوالی اضافه نشده است. از دکمه‌های بالا برای افزودن سوال استفاده کنید.
+                    </div>
+                `;
+                return;
+            }
+
+            const typeBadges = {
+                descriptive: { label: 'تشریحی', color: 'bg-blue-100 text-blue-700' },
+                mcq: { label: 'چهارگزینه‌ای', color: 'bg-emerald-100 text-emerald-700' },
+                blank: { label: 'جای خالی', color: 'bg-amber-100 text-amber-700' },
+                tf: { label: 'صحیح / غلط', color: 'bg-purple-100 text-purple-700' }
+            };
+
+            appState.questions.forEach((q, idx) => {
+                const badge = typeBadges[q.type] || typeBadges.descriptive;
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm space-y-3 transition hover:border-blue-300';
+
+                let optionsHtml = '';
+                if (q.type === 'mcq') {
+                    optionsHtml = `
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            ${q.options.map((opt, oIdx) => `
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs font-bold text-slate-400 w-5">${toPersianDigits(oIdx + 1)})</span>
+                                    <input type="text" value="${escapeHtml(opt)}" 
+                                        oninput="updateQuestionOption(${idx}, ${oIdx}, this.value)"
+                                        class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-blue-500 outline-none">
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-lg bg-slate-800 text-white text-xs font-bold flex items-center justify-center">${toPersianDigits(idx + 1)}</span>
+                            <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md ${badge.color}">${badge.label}</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button onclick="moveQuestion(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="انتقال به بالا" class="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30">
+                                <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button onclick="moveQuestion(${idx}, 1)" ${idx === appState.questions.length - 1 ? 'disabled' : ''} title="انتقال به پایین" class="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30">
+                                <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button onclick="deleteQuestion(${idx})" title="حذف سوال" class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <textarea rows="2" oninput="updateQuestionField(${idx}, 'text', this.value)" 
+                            placeholder="صورت سوال را اینجا بنویسید..."
+                            class="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed">${escapeHtml(q.text)}</textarea>
+                    </div>
+
+                    ${optionsHtml}
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100 items-center">
+                        <div class="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                            <label class="text-[11px] font-medium text-slate-600 whitespace-nowrap">هدف/مبحث:</label>
+                            <input type="text" value="${escapeHtml(q.skill || '')}" 
+                                placeholder="مثلاً: کسرها (اختیاری)"
+                                oninput="updateQuestionField(${idx}, 'skill', this.value)"
+                                class="w-full text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 text-slate-700 outline-none focus:border-blue-500">
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2">
+                            ${q.image ? `
+                                <button onclick="removeQuestionImage(${idx})" class="flex items-center gap-1 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 rounded-xl font-medium transition">
+                                    <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
+                                    <span>حذف تصویر</span>
+                                </button>
+                            ` : `
+                                <label class="flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl font-medium cursor-pointer transition">
+                                    <i data-lucide="image-plus" class="w-3.5 h-3.5 text-blue-600"></i>
+                                    <span>افزودن تصویر</span>
+                                    <input type="file" accept="image/*" onchange="handleImageUpload(${idx}, event)" class="hidden">
+                                </label>
+                            `}
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50/50 px-3 py-2 rounded-xl border border-blue-100">
+                        <div class="flex justify-between items-center text-[11px] font-medium text-slate-600 mb-1">
+                            <span>فضای خالی پاسخ‌دهی زیر این سوال:</span>
+                            <span id="space-label-${idx}" class="text-blue-700 font-bold">${q.extraSpace} پیکسل</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="changeQuestionSpace(${idx}, -15)" class="w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center text-xs font-bold">-</button>
+                            <input type="range" min="0" max="260" step="5" value="${q.extraSpace}" 
+                                oninput="updateQuestionField(${idx}, 'extraSpace', parseInt(this.value, 10))"
+                                class="flex-1 accent-blue-600 cursor-pointer h-1.5">
+                            <button onclick="changeQuestionSpace(${idx}, 15)" class="w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center text-xs font-bold">+</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+
+        // فعال یا غیرفعال کردن جدول توصیفی
+        function toggleDescriptiveTable() {
+            appState.descriptive.enabled = document.getElementById('chk-enable-descriptive').checked;
+            toggleDescriptiveControlsVisibility();
+            saveToStorage();
+            renderPaper();
+        }
+
+        function toggleDescriptiveControlsVisibility() {
+            const wrapper = document.getElementById('descriptive-controls-wrapper');
+            if (!wrapper) return;
+            if (appState.descriptive.enabled) {
+                wrapper.classList.remove('opacity-40', 'pointer-events-none');
+            } else {
+                wrapper.classList.add('opacity-40', 'pointer-events-none');
+            }
+        }
+
+        // به‌روزرسانی عنوان و جمع‌بندی جدول توصیفی
+        function updateDescriptiveMeta() {
+            appState.descriptive.title = document.getElementById('inp-desc-title').value;
+            appState.descriptive.summary = document.getElementById('inp-desc-summary').value;
+            appState.descriptive.showSignatures = document.getElementById('chk-signatures').checked;
+            saveToStorage();
+            renderPaper();
+        }
+
+        // افزودن ردیف جدید به جدول توصیفی
+        function addDescriptiveRow() {
+            appState.descriptive.rows.push({
+                id: 'd_' + Date.now(),
+                objective: 'دانش‌آموز توانسته مبحث جدید را به درستی درک و حل نماید.',
+                level: '',
+                comment: ''
+            });
+            saveToStorage();
+            renderDescriptiveEditor();
+            renderPaper();
+        }
+
+        // حذف ردیف از جدول توصیفی
+        function deleteDescriptiveRow(index) {
+            appState.descriptive.rows.splice(index, 1);
+            saveToStorage();
+            renderDescriptiveEditor();
+            renderPaper();
+        }
+
+        // ویرایش ردیف جدول توصیفی
+        function updateDescriptiveRow(index, field, value) {
+            appState.descriptive.rows[index][field] = value;
+            saveToStorage();
+            if (field === 'level') {
+                renderDescriptiveEditor();
+            }
+            renderPaper();
+        }
+
+        // رندر کردن ویرایشگر ردیف‌های جدول توصیفی
+        function renderDescriptiveEditor() {
+            const list = document.getElementById('descriptive-rows-list');
+            list.innerHTML = '';
+
+            const levels = [
+                { key: 'very_good', label: 'خیلی خوب' },
+                { key: 'good', label: 'خوب' },
+                { key: 'acceptable', label: 'قابل قبول' },
+                { key: 'needs_effort', label: 'نیاز به تلاش' }
+            ];
+
+            appState.descriptive.rows.forEach((row, idx) => {
+                const item = document.createElement('div');
+                item.className = 'bg-white p-3 rounded-xl border border-slate-200 space-y-2.5 shadow-sm';
+
+                item.innerHTML = `
+                    <div class="flex items-start justify-between gap-2">
+                        <span class="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded-md mt-0.5">ردیف ${toPersianDigits(idx + 1)}</span>
+                        <button onclick="deleteDescriptiveRow(${idx})" class="text-rose-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-500 mb-1">مبحث / هدف آموزشی:</label>
+                        <textarea rows="2" oninput="updateDescriptiveRow(${idx}, 'objective', this.value)" 
+                            class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-blue-500 outline-none">${escapeHtml(row.objective)}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-500 mb-1">پیش‌انتخاب سطح عملکرد (یا خالی بگذارید تا پس از تصحیح تیک بخورد):</label>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                            ${levels.map(lvl => {
+                                const isSelected = row.level === lvl.key;
+                                return `
+                                    <button onclick="updateDescriptiveRow(${idx}, 'level', '${isSelected ? '' : lvl.key}')" 
+                                        class="py-1 px-1.5 rounded-lg text-[11px] font-medium border transition ${isSelected ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}">
+                                        ${lvl.label}
+                                    </button>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                    <div>
+                        <input type="text" value="${escapeHtml(row.comment)}" 
+                            oninput="updateDescriptiveRow(${idx}, 'comment', this.value)"
+                            placeholder="توضیحات اختیاری معلم در این ردیف..."
+                            class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-blue-500 outline-none">
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+
+        // رندر کردن برگه امتحانی A4 (پیش‌نمایش زنده و نسخه چاپ)
+        function renderPaper() {
+            const paper = document.getElementById('exam-paper');
+            const { meta, settings, questions, descriptive } = appState;
+
+            // ساخت سربرگ رسمی برگه امتحان
+            const headerHtml = `
+                <div class="mb-5">
+                    <div class="text-center text-xs font-bold text-slate-700 mb-2">${escapeHtml(meta.bismillah)}</div>
+                    <div class="border-2 border-slate-800 rounded-xl overflow-hidden">
+                        <div class="bg-slate-100 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between">
+                            <div class="text-xs font-bold text-slate-700">${escapeHtml(meta.school)}</div>
+                            <div class="text-sm font-extrabold text-slate-900">${escapeHtml(meta.title)}</div>
+                            <div class="text-xs font-bold text-slate-700">درس: ${escapeHtml(meta.subject)}</div>
+                        </div>
+                        <div class="p-3 grid grid-cols-12 gap-y-2.5 gap-x-3 text-xs bg-white">
+                            <div class="col-span-6 flex items-center gap-1">
+                                <span class="font-semibold text-slate-700 whitespace-nowrap">نام و نام خانوادگی:</span>
+                                <span class="border-b border-dotted border-slate-500 flex-1 h-4"></span>
+                            </div>
+                            <div class="col-span-3">
+                                <span class="font-semibold text-slate-700">پایه/کلاس:</span>
+                                <span class="text-slate-900">${escapeHtml(meta.grade)}</span>
+                            </div>
+                            <div class="col-span-3">
+                                <span class="font-semibold text-slate-700">تاریخ:</span>
+                                <span class="text-slate-900">${escapeHtml(meta.date)}</span>
+                            </div>
+
+                            <div class="col-span-5">
+                                <span class="font-semibold text-slate-700">نام آموزگار/دبیر:</span>
+                                <span class="text-slate-900">${escapeHtml(meta.teacher)}</span>
+                            </div>
+                            <div class="col-span-4">
+                                <span class="font-semibold text-slate-700">مدت پاسخ‌گویی:</span>
+                                <span class="text-slate-900">${escapeHtml(meta.duration)}</span>
+                            </div>
+                            <div class="col-span-3">
+                                <span class="font-semibold text-slate-700">نوع ارزشیابی:</span>
+                                <span class="text-slate-900 font-bold">توصیفی</span>
+                            </div>
+
+                            ${meta.showSeatNumber ? `
+                                <div class="col-span-6 flex items-center gap-1 pt-0.5">
+                                    <span class="font-semibold text-slate-700 whitespace-nowrap">نام پدر:</span>
+                                    <span class="border-b border-dotted border-slate-500 flex-1 h-4"></span>
+                                </div>
+                                <div class="col-span-6 flex items-center gap-1 pt-0.5">
+                                    <span class="font-semibold text-slate-700 whitespace-nowrap">شماره صندلی / کد دانش‌آموزی:</span>
+                                    <span class="border-b border-dotted border-slate-500 flex-1 h-4"></span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // ساخت لیست سوالات
+            let questionsHtml = `<div style="font-size: ${settings.fontSize}px;">`;
+
+            questions.forEach((q, idx) => {
+                const formattedText = escapeHtml(q.text).replace(/\n/g, '<br>');
+                const marginBottom = settings.globalSpacing;
+
+                let typeSpecificBody = '';
+                if (q.type === 'mcq') {
+                    typeSpecificBody = `
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2.5 pr-4">
+                            ${q.options.map((opt, oIdx) => `
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-4 h-4 rounded-full border border-slate-600 inline-flex items-center justify-center text-[10px] font-bold shrink-0">${toPersianDigits(oIdx + 1)}</span>
+                                    <span>${escapeHtml(opt)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else if (q.type === 'tf') {
+                    typeSpecificBody = `
+                        <div class="mt-2 pr-4 flex items-center gap-6 text-xs text-slate-700">
+                            <span>الف) صحیح <span class="inline-block w-3.5 h-3.5 border border-slate-600 align-middle mr-1"></span> &nbsp;&nbsp; غلط <span class="inline-block w-3.5 h-3.5 border border-slate-600 align-middle mr-1"></span></span>
+                            <span>ب) صحیح <span class="inline-block w-3.5 h-3.5 border border-slate-600 align-middle mr-1"></span> &nbsp;&nbsp; غلط <span class="inline-block w-3.5 h-3.5 border border-slate-600 align-middle mr-1"></span></span>
+                        </div>
+                    `;
+                }
+
+                const imageHtml = q.image ? `
+                    <div class="my-2.5 pr-4">
+                        <img src="${q.image}" alt="تصویر سوال" class="max-h-44 rounded-lg border border-slate-200 object-contain">
+                    </div>
+                ` : '';
+
+                let answerSpaceHtml = '';
+                if (q.extraSpace > 0) {
+                    if (settings.lineStyle === 'lined' && q.extraSpace >= 28) {
+                        answerSpaceHtml = `<div class="answer-lines mt-2" style="height: ${q.extraSpace}px;"></div>`;
+                    } else {
+                        answerSpaceHtml = `<div style="height: ${q.extraSpace}px;"></div>`;
+                    }
+                }
+
+                questionsHtml += `
+                    <div class="question-block border-b border-slate-200/80 pb-2" style="margin-bottom: ${marginBottom}px;">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex items-start gap-2 flex-1 leading-relaxed">
+                                <span class="font-extrabold text-slate-900 shrink-0">${toPersianDigits(idx + 1)}-</span>
+                                <div class="flex-1">
+                                    ${q.skill ? `<span class="inline-block text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-300 rounded px-1.5 py-0.5 mb-1">هدف: ${escapeHtml(q.skill)}</span>` : ''}
+                                    <div class="font-medium text-slate-900">${formattedText}</div>
+                                    ${imageHtml}
+                                    ${typeSpecificBody}
+                                </div>
+                            </div>
+                            ${meta.showQuestionEval ? `
+                                <div class="shrink-0 border border-slate-300 rounded-lg px-2 py-1 bg-slate-50 text-[9px] text-slate-700 space-y-0.5">
+                                    <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 border border-slate-500 inline-block"></span> خیلی خوب</div>
+                                    <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 border border-slate-500 inline-block"></span> خوب</div>
+                                    <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 border border-slate-500 inline-block"></span> قابل قبول</div>
+                                    <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 border border-slate-500 inline-block"></span> نیاز به تلاش</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                        ${answerSpaceHtml}
+                    </div>
+                `;
+            });
+
+            questionsHtml += `</div>`;
+
+            // ساخت جدول عملکرد توصیفی انتهای برگه
+            let descriptiveHtml = '';
+            if (descriptive.enabled) {
+                const checkMark = `<span class="font-extrabold text-slate-900 text-sm">✓</span>`;
+                const emptyBox = `<span class="inline-block w-3.5 h-3.5 border border-slate-400 rounded-sm"></span>`;
+
+                descriptiveHtml = `
+                    <div class="descriptive-section mt-6 pt-3 border-t-2 border-slate-800">
+                        <div class="bg-slate-100 border border-slate-800 border-b-0 rounded-t-xl px-3 py-2 text-center font-bold text-xs text-slate-900">
+                            ${escapeHtml(descriptive.title)}
+                        </div>
+                        <table class="w-full border-collapse border border-slate-800 text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-800 font-bold">
+                                    <th class="border border-slate-800 p-1.5 w-9 text-center">ردیف</th>
+                                    <th class="border border-slate-800 p-1.5 text-right">مبحث و انتظارات آموزشی مورد ارزیابی</th>
+                                    <th class="border border-slate-800 p-1.5 w-16 text-center">خیلی خوب</th>
+                                    <th class="border border-slate-800 p-1.5 w-14 text-center">خوب</th>
+                                    <th class="border border-slate-800 p-1.5 w-16 text-center">قابل قبول</th>
+                                    <th class="border border-slate-800 p-1.5 w-20 text-center">نیاز به تلاش</th>
+                                    <th class="border border-slate-800 p-1.5 w-32 text-right">توضیحات معلم</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${descriptive.rows.map((r, rIdx) => `
+                                    <tr>
+                                        <td class="border border-slate-800 p-1.5 text-center font-bold">${toPersianDigits(rIdx + 1)}</td>
+                                        <td class="border border-slate-800 p-1.5 leading-relaxed">${escapeHtml(r.objective)}</td>
+                                        <td class="border border-slate-800 p-1.5 text-center">${r.level === 'very_good' ? checkMark : emptyBox}</td>
+                                        <td class="border border-slate-800 p-1.5 text-center">${r.level === 'good' ? checkMark : emptyBox}</td>
+                                        <td class="border border-slate-800 p-1.5 text-center">${r.level === 'acceptable' ? checkMark : emptyBox}</td>
+                                        <td class="border border-slate-800 p-1.5 text-center">${r.level === 'needs_effort' ? checkMark : emptyBox}</td>
+                                        <td class="border border-slate-800 p-1.5 text-[11px] text-slate-700">${escapeHtml(r.comment)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+
+                        <div class="border border-t-0 border-slate-800 p-2.5 text-xs bg-white ${descriptive.showSignatures ? '' : 'rounded-b-xl'}">
+                            <div class="font-bold text-slate-800 mb-1">بازخورد توصیفی و راهنمایی معلم:</div>
+                            <div class="min-h-[34px] text-slate-700 leading-relaxed">
+                                ${descriptive.summary ? escapeHtml(descriptive.summary).replace(/\n/g, '<br>') : '<div class="border-b border-dotted border-slate-400 h-4 mt-1"></div><div class="border-b border-dotted border-slate-400 h-4 mt-2"></div>'}
+                            </div>
+                        </div>
+
+                        ${descriptive.showSignatures ? `
+                            <div class="border border-t-0 border-slate-800 rounded-b-xl p-3 grid grid-cols-2 gap-4 text-xs bg-slate-50/60">
+                                <div class="text-center space-y-6">
+                                    <div class="font-semibold text-slate-700">مهر و امضای آموزگار / دبیر:</div>
+                                    <div class="text-slate-400 text-[10px]">........................................</div>
+                                </div>
+                                <div class="text-center space-y-6 border-r border-slate-300">
+                                    <div class="font-semibold text-slate-700">نظر و امضای ولی محترم دانش‌آموز:</div>
+                                    <div class="text-slate-400 text-[10px]">........................................</div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            paper.innerHTML = headerHtml + questionsHtml + descriptiveHtml;
+        }
+
+        // خروجی PDF مستقیم با کتابخانه html2pdf
+        function downloadPDF() {
+            const element = document.getElementById('exam-paper');
+            const btn = document.getElementById('pdf-btn');
+
+            if (typeof html2pdf === 'undefined') {
+                showToast('در حال باز کردن پنجره چاپ و ذخیره PDF مرورگر...');
+                window.print();
+                return;
+            }
+
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>در حال ساخت PDF...</span>`;
+            btn.disabled = true;
+            if (window.lucide) lucide.createIcons();
+
+            const fileName = (appState.meta.title || 'آزمون-توصیفی').replace(/\s+/g, '-') + '.pdf';
+
+            const opt = {
+                margin: [8, 8, 8, 8],
+                filename: fileName,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+                if (window.lucide) lucide.createIcons();
+                showToast('فایل PDF برگه آزمون با موفقیت دانلود شد!');
+            }).catch((err) => {
+                console.error(err);
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+                if (window.lucide) lucide.createIcons();
+                showToast('از دکمه «چاپ / ذخیره PDF» برای ذخیره باکیفیت استفاده کنید.');
+                window.print();
+            });
+        }
+
+        // راه‌اندازی اولیه پس از بارگذاری کامل صفحه
+        window.addEventListener('DOMContentLoaded', () => {
+            loadFromStorage();
+            populateInputsFromState();
+            renderQuestionsEditor();
+            renderDescriptiveEditor();
+            renderPaper();
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+</html>
