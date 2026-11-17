@@ -121,6 +121,18 @@
                 page-break-inside: avoid;
             }
         }
+
+        /* کلاس کمکی هنگام تولید مستقیم PDF برای اطمینان از ابعاد دقیق A4 و جلوگیری از برش */
+        .pdf-export-mode {
+            width: 210mm !important;
+            max-width: 210mm !important;
+            min-height: auto !important;
+            padding: 10mm 12mm !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            background: #ffffff !important;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -484,7 +496,7 @@
             }
         };
 
-        // کلید جدید در localStorage تا با نسخه قبلی تداخل نداشته باشد
+        // کلید ذخیره‌سازی در localStorage
         const STORAGE_KEY = 'descriptive_exam_builder_v2';
 
         let appState = JSON.parse(JSON.stringify(defaultState));
@@ -1121,10 +1133,10 @@
                         <div class="bg-slate-100 border border-slate-800 border-b-0 rounded-t-xl px-3 py-2 text-center font-bold text-xs text-slate-900">
                             ${escapeHtml(descriptive.title)}
                         </div>
-                        <table class="w-full border-collapse border border-slate-800 text-xs">
+                        <table class="w-full table-fixed border-collapse border border-slate-800 text-[11px]">
                             <thead>
                                 <tr class="bg-slate-50 text-slate-800 font-bold">
-                                    <th class="border border-slate-800 p-1.5 w-9 text-center">ردیف</th>
+                                    <th class="border border-slate-800 p-1.5 w-10 text-center">ردیف</th>
                                     <th class="border border-slate-800 p-1.5 text-right">مبحث و انتظارات آموزشی مورد ارزیابی</th>
                                     <th class="border border-slate-800 p-1.5 w-16 text-center">خیلی خوب</th>
                                     <th class="border border-slate-800 p-1.5 w-14 text-center">خوب</th>
@@ -1137,12 +1149,12 @@
                                 ${descriptive.rows.map((r, rIdx) => `
                                     <tr>
                                         <td class="border border-slate-800 p-1.5 text-center font-bold">${toPersianDigits(rIdx + 1)}</td>
-                                        <td class="border border-slate-800 p-1.5 leading-relaxed">${escapeHtml(r.objective)}</td>
+                                        <td class="border border-slate-800 p-1.5 leading-relaxed break-words">${escapeHtml(r.objective)}</td>
                                         <td class="border border-slate-800 p-1.5 text-center">${r.level === 'very_good' ? checkMark : emptyBox}</td>
                                         <td class="border border-slate-800 p-1.5 text-center">${r.level === 'good' ? checkMark : emptyBox}</td>
                                         <td class="border border-slate-800 p-1.5 text-center">${r.level === 'acceptable' ? checkMark : emptyBox}</td>
                                         <td class="border border-slate-800 p-1.5 text-center">${r.level === 'needs_effort' ? checkMark : emptyBox}</td>
-                                        <td class="border border-slate-800 p-1.5 text-[11px] text-slate-700">${escapeHtml(r.comment)}</td>
+                                        <td class="border border-slate-800 p-1.5 text-[10px] text-slate-700 break-words">${escapeHtml(r.comment)}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -1174,9 +1186,10 @@
             paper.innerHTML = headerHtml + questionsHtml + descriptiveHtml;
         }
 
-        // خروجی PDF مستقیم با کتابخانه html2pdf
-        function downloadPDF() {
+        // خروجی PDF مستقیم با تنظیمات دقیق A4، رفع مشکل مخفی بودن در موبایل و جلوگیری از برش جدول
+        async function downloadPDF() {
             const element = document.getElementById('exam-paper');
+            const previewPanel = document.getElementById('preview-panel');
             const btn = document.getElementById('pdf-btn');
 
             if (typeof html2pdf === 'undefined') {
@@ -1190,30 +1203,56 @@
             btn.disabled = true;
             if (window.lucide) lucide.createIcons();
 
+            // اگر در حالت موبایل پنل پیش‌نمایش مخفی است، موقتاً آن را برای گرفتن خروجی قابل مشاهده می‌کنیم
+            const wasHidden = previewPanel.classList.contains('hidden');
+            if (wasHidden) {
+                previewPanel.classList.remove('hidden');
+            }
+
+            // اعمال استایل دقیق A4 و اسکرول به بالای کانتینر برای جلوگیری از برش تصویر
+            const prevScrollTop = previewPanel.scrollTop;
+            previewPanel.scrollTop = 0;
+            element.classList.add('pdf-export-mode');
+
+            // صبر کوتاه برای اعمال کامل استایل‌ها و فونت‌ها در DOM
+            await new Promise(resolve => setTimeout(resolve, 150));
+
             const fileName = (appState.meta.title || 'آزمون-توصیفی').replace(/\s+/g, '-') + '.pdf';
 
             const opt = {
-                margin: [8, 8, 8, 8],
+                margin: [6, 4, 6, 4],
                 filename: fileName,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    letterRendering: true,
+                    scrollY: 0,
+                    scrollX: 0,
+                    windowWidth: 1024
+                },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                pagebreak: { mode: ['css', 'legacy'], avoid: ['.question-block', 'tr', '.descriptive-section'] }
             };
 
-            html2pdf().set(opt).from(element).save().then(() => {
-                btn.innerHTML = originalContent;
-                btn.disabled = false;
-                if (window.lucide) lucide.createIcons();
+            try {
+                await html2pdf().set(opt).from(element).save();
                 showToast('فایل PDF برگه آزمون با موفقیت دانلود شد!');
-            }).catch((err) => {
+            } catch (err) {
                 console.error(err);
-                btn.innerHTML = originalContent;
-                btn.disabled = false;
-                if (window.lucide) lucide.createIcons();
                 showToast('از دکمه «چاپ / ذخیره PDF» برای ذخیره باکیفیت استفاده کنید.');
                 window.print();
-            });
+            } finally {
+                // بازگرداندن وضعیت ظاهری صفحه به حالت عادی
+                element.classList.remove('pdf-export-mode');
+                previewPanel.scrollTop = prevScrollTop;
+                if (wasHidden) {
+                    previewPanel.classList.add('hidden');
+                }
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+                if (window.lucide) lucide.createIcons();
+            }
         }
 
         // راه‌اندازی اولیه پس از بارگذاری کامل صفحه
