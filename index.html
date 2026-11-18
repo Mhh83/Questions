@@ -12,132 +12,29 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- بارگذاری آیکون‌های Lucide -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- بارگذاری کتابخانه html2pdf برای دانلود مستقیم PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- بارگذاری کتابخانه‌های html2canvas و jsPDF برای تولید مستقیم و دقیق PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Vazirmatn', 'sans-serif'],
-                    },
-                    colors: {
-                        primary: {
-                            50: '#eff6ff',
-                            100: '#dbeafe',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
-    <style>
-        /* تنظیمات پایه و فونت */
-        body {
-            font-family: 'Vazirmatn', sans-serif;
-            background-color: #f1f5f9;
-            color: #1e293b;
-            overflow-x: hidden;
-        }
-
-        /* استایل برگه A4 در حالت پیش‌نمایش */
-        .a4-sheet {
-            width: 210mm;
-            min-height: 297mm;
-            background: white;
-            margin: 0 auto;
-            padding: 15mm;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-            box-sizing: border-box;
-            position: relative;
-            transition: all 0.2s ease;
-        }
-
-        /* خطوط نقطه‌چین یا خط‌کشی برای فضای پاسخ‌دهی تشریحی */
-        .answer-lines {
-            background-image: repeating-linear-gradient(
-                to bottom,
-                transparent,
-                transparent 27px,
-                #cbd5e1 28px
-            );
-            width: 100%;
-        }
-
-        /* اسکرول‌بار سفارشی زیبا */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 9999px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-
-        /* قوانین حیاتی برای چاپ و خروجی PDF */
-        @media print {
-            @page {
-                size: A4 portrait;
-                margin: 10mm;
-            }
-            body {
-                background: white !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            .no-print {
-                display: none !important;
-            }
-            .print-container {
-                width: 100% !important;
-                max-width: 100% !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                overflow: visible !important;
-                display: block !important;
-            }
-            .a4-sheet {
-                width: 100% !important;
-                min-height: auto !important;
-                box-shadow: none !important;
-                margin: 0 !important;
-                padding: 5mm !important;
-                border: none !important;
-            }
-            /* جلوگیری از نصف شدن سوالات یا ردیف‌های جدول در مرز صفحات چاپ */
-            .question-block, tr, .descriptive-section {
-                break-inside: avoid;
-                page-break-inside: avoid;
-            }
-        }
-
+// ... existing code ... -->
         /* استایل کانتینر موقت هنگام تولید PDF برای چیدمان دقیق صفحه‌بندی شده */
         .pdf-render-sandbox {
             position: fixed;
             top: 0;
-            left: -9999px;
-            width: 210mm;
+            left: 0;
+            width: 794px; /* عرض دقیق A4 در 96 DPI */
             background: #ffffff;
             color: #0f172a;
             font-family: 'Vazirmatn', sans-serif;
             direction: rtl;
-            z-index: -1;
+            z-index: -9999;
+            pointer-events: none;
         }
         .pdf-virtual-page {
-            width: 210mm;
-            height: 296.5mm;
-            padding: 12mm 14mm;
+            width: 794px;
+            height: 1122px; /* ارتفاع دقیق A4 در 96 DPI */
+            padding: 45px 50px;
             box-sizing: border-box;
             background: #ffffff;
             position: relative;
@@ -1193,19 +1090,12 @@
                                 </div>
                             </div>
                         ` : ''}
-                    </div>
-                `;
-            }
-
-            paper.innerHTML = headerHtml + questionsHtml + descriptiveHtml;
-        }
-
-        // خروجی PDF دقیق با صفحه‌بندی هوشمند A4 و رندر بدون باگ فونت فارسی
+        // خروجی PDF دقیق با صفحه‌بندی هوشمند A4 و رندر مستقیم روی jsPDF
         async function downloadPDF() {
             const sourcePaper = document.getElementById('exam-paper');
             const btn = document.getElementById('pdf-btn');
 
-            if (typeof html2pdf === 'undefined') {
+            if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
                 showToast('در حال باز کردن پنجره چاپ و ذخیره PDF مرورگر...');
                 window.print();
                 return;
@@ -1216,13 +1106,12 @@
             btn.disabled = true;
             if (window.lucide) lucide.createIcons();
 
-            // ایجاد محیط ایزوله برای چیدمان و صفحه‌بندی دقیق هر برگه A4
+            // ایجاد کانتینر استاندارد A4 در مختصات (0,0) پشت صفحه برای اسکرین‌شات بدون نقص
             const sandbox = document.createElement('div');
             sandbox.className = 'pdf-render-sandbox';
             document.body.appendChild(sandbox);
 
             try {
-                // استخراج تمام بلوک‌های اصلی برگه (سربرگ، تک‌تک سوالات، و بخش جدول توصیفی)
                 const headerEl = sourcePaper.querySelector('.exam-header-block');
                 const questionEls = Array.from(sourcePaper.querySelectorAll('.question-block'));
                 const descriptiveEl = sourcePaper.querySelector('.descriptive-section');
@@ -1232,17 +1121,15 @@
                 questionEls.forEach(q => blocks.push({ el: q.cloneNode(true), isQuestion: true }));
                 if (descriptiveEl) blocks.push({ el: descriptiveEl.cloneNode(true), isQuestion: false });
 
-                // ساخت اولین صفحه مجازی A4
                 let pages = [];
                 let currentPage = document.createElement('div');
                 currentPage.className = 'pdf-virtual-page';
                 sandbox.appendChild(currentPage);
                 pages.push(currentPage);
 
-                // حداکثر ارتفاع قابل استفاده در هر صفحه A4 (با احتساب حاشیه بالا و پایین)
-                const maxPageHeight = currentPage.clientHeight - 24;
+                // ارتفاع مفید داخل صفحه با حاشیه امن پایین
+                const maxPageHeight = 1122 - 85;
 
-                // توزیع هوشمند بلوک‌ها در صفحات A4 به‌طوری که هیچ سوال یا جدولی نصفه برش نخورد
                 for (let i = 0; i < blocks.length; i++) {
                     const item = blocks[i];
                     let wrapper = item.el;
@@ -1256,7 +1143,6 @@
 
                     currentPage.appendChild(wrapper);
 
-                    // اگر افزودن این بلوک باعث سرریز شدن صفحه شد (و صفحه خالی نبود)، آن را به صفحه بعدی منتقل کن
                     if (currentPage.scrollHeight > maxPageHeight && currentPage.children.length > 1) {
                         currentPage.removeChild(wrapper);
 
@@ -1269,48 +1155,59 @@
                     }
                 }
 
-                // افزودن شماره صفحه فارسی به پایین تمام صفحات در صورت چندصفحه‌ای بودن
+                // درج شماره صفحه فارسی در انتهای صفحات
                 if (pages.length > 1) {
                     pages.forEach((p, idx) => {
                         const footer = document.createElement('div');
                         footer.style.marginTop = 'auto';
-                        footer.style.paddingTop = '8px';
+                        footer.style.paddingTop = '10px';
+                        footer.style.borderTop = '1px solid #e2e8f0';
                         footer.style.textAlign = 'center';
-                        footer.style.fontSize = '10px';
+                        footer.style.fontSize = '11px';
                         footer.style.color = '#64748b';
                         footer.textContent = `صفحه ${toPersianDigits(idx + 1)} از ${toPersianDigits(pages.length)}`;
                         p.appendChild(footer);
                     });
                 }
 
-                // صبر کوتاه برای بارگذاری کامل فونت وزیرمتن و تصاویر داخل صفحات مجازی
                 await document.fonts.ready;
-                await new Promise(resolve => setTimeout(resolve, 250));
+                await new Promise(resolve => setTimeout(resolve, 300));
 
-                const fileName = (appState.meta.title || 'آزمون-توصیفی').replace(/\s+/g, '-') + '.pdf';
-
-                // تبدیل هر صفحه مجازی A4 به تصویر باکیفیت و افزودن مستقیم به فایل PDF
-                const worker = html2pdf().set({
-                    margin: 0,
-                    filename: fileName,
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: {
-                        scale: 2,
-                        useCORS: true,
-                        letterRendering: false, // جلوگیری از به‌هم‌ریختگی حروف و کسرهای فارسی
-                        logging: false
-                    },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4',
+                    compress: true
                 });
 
-                let pdfChain = worker.from(pages[0]).toPdf();
-                for (let pIdx = 1; pIdx < pages.length; pIdx++) {
-                    pdfChain = pdfChain.get('pdf').then(pdf => {
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+
+                // رندر تک‌تک صفحات مجازی به تصویر باکیفیت و درج کامل در فایل PDF
+                for (let pIdx = 0; pIdx < pages.length; pIdx++) {
+                    const pageEl = pages[pIdx];
+                    const canvas = await html2canvas(pageEl, {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: '#ffffff',
+                        width: 794,
+                        height: 1122,
+                        windowWidth: 1200,
+                        scrollX: 0,
+                        scrollY: 0,
+                        logging: false
+                    });
+
+                    const imgData = canvas.toDataURL('image/jpeg', 0.96);
+                    if (pIdx > 0) {
                         pdf.addPage();
-                    }).from(pages[pIdx]).toContainer().toCanvas().toPdf();
+                    }
+                    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
                 }
 
-                await pdfChain.save();
+                const fileName = (appState.meta.title || 'آزمون-توصیفی').replace(/\s+/g, '-') + '.pdf';
+                pdf.save(fileName);
                 showToast('فایل PDF با چیدمان دقیق و کامل دانلود شد!');
             } catch (err) {
                 console.error('خطا در ساخت PDF:', err);
