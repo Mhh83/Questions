@@ -17,7 +17,75 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <script>
-// ... existing code ... -->
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Vazirmatn', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* تنظیمات پایه و فونت */
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+            overflow-x: hidden;
+        }
+
+        /* استایل برگه A4 در حالت پیش‌نمایش */
+        .a4-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            margin: 0 auto;
+            padding: 15mm;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        /* خطوط نقطه‌چین یا خط‌کشی برای فضای پاسخ‌دهی تشریحی */
+        .answer-lines {
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent,
+                transparent 27px,
+                #cbd5e1 28px
+            );
+            width: 100%;
+        }
+
+        /* اسکرول‌بار سفارشی زیبا */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
         /* استایل کانتینر موقت هنگام تولید PDF برای چیدمان دقیق صفحه‌بندی شده */
         .pdf-render-sandbox {
             position: fixed;
@@ -41,6 +109,42 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+        }
+
+        /* قوانین حیاتی برای چاپ مرورگر */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 10mm;
+            }
+            body {
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+            .a4-sheet {
+                width: 100% !important;
+                min-height: auto !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 5mm !important;
+                border: none !important;
+            }
+            .question-block, tr, .descriptive-section {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
         }
     </style>
 </head>
@@ -1090,6 +1194,13 @@
                                 </div>
                             </div>
                         ` : ''}
+                    </div>
+                `;
+            }
+
+            paper.innerHTML = headerHtml + questionsHtml + descriptiveHtml;
+        }
+
         // خروجی PDF دقیق با صفحه‌بندی هوشمند A4 و رندر مستقیم روی jsPDF
         async function downloadPDF() {
             const sourcePaper = document.getElementById('exam-paper');
