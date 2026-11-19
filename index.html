@@ -12,10 +12,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- بارگذاری آیکون‌های Lucide -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- بارگذاری کتابخانه‌های html2canvas و jsPDF برای تولید مستقیم و دقیق PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
     <script>
         tailwind.config = {
             theme: {
@@ -57,6 +53,26 @@
             box-sizing: border-box;
             position: relative;
             transition: all 0.2s ease;
+            --page-border-inset: 5mm;
+            --page-border-width: 1mm;
+        }
+
+        .a4-sheet.page-border-enabled::after {
+            content: "";
+            position: absolute;
+            inset: var(--page-border-inset);
+            border: var(--page-border-width) solid #334155;
+            box-sizing: border-box;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .a4-sheet.page-border-enabled[data-page-border-style="double"]::after {
+            border-style: double;
+        }
+
+        .a4-sheet.page-border-enabled[data-page-border-style="dashed"]::after {
+            border-style: dashed;
         }
 
         /* خطوط نقطه‌چین یا خط‌کشی برای فضای پاسخ‌دهی تشریحی */
@@ -68,6 +84,26 @@
                 #cbd5e1 28px
             );
             width: 100%;
+        }
+
+        .descriptive-section {
+            break-inside: auto;
+            page-break-inside: auto;
+        }
+
+        .descriptive-section table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+        }
+
+        .descriptive-section thead {
+            display: table-header-group;
+        }
+
+        .descriptive-section tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
 
         /* اسکرول‌بار سفارشی زیبا */
@@ -86,66 +122,92 @@
             background: #94a3b8;
         }
 
-        /* استایل کانتینر موقت هنگام تولید PDF برای چیدمان دقیق صفحه‌بندی شده */
-        .pdf-render-sandbox {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 794px; /* عرض دقیق A4 در 96 DPI */
-            background: #ffffff;
-            color: #0f172a;
-            font-family: 'Vazirmatn', sans-serif;
-            direction: rtl;
-            z-index: -9999;
-            pointer-events: none;
-        }
-        .pdf-virtual-page {
-            width: 794px;
-            height: 1122px; /* ارتفاع دقیق A4 در 96 DPI */
-            padding: 45px 50px;
-            box-sizing: border-box;
-            background: #ffffff;
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* قوانین حیاتی برای چاپ مرورگر */
+        /* قوانین حیاتی برای چاپ و خروجی PDF */
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 10mm;
+                margin: 0;
             }
             body {
                 background: white !important;
+                display: block !important;
+                height: auto !important;
+                min-height: 0 !important;
+                overflow: visible !important;
                 margin: 0 !important;
                 padding: 0 !important;
             }
             .no-print {
                 display: none !important;
             }
+            main {
+                display: block !important;
+                position: static !important;
+                height: auto !important;
+                min-height: 0 !important;
+                overflow: visible !important;
+            }
             .print-container {
                 width: 100% !important;
                 max-width: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
                 padding: 0 !important;
                 margin: 0 !important;
                 overflow: visible !important;
                 display: block !important;
+                background: white !important;
             }
             .a4-sheet {
-                width: 100% !important;
+                width: auto !important;
+                max-width: none !important;
                 min-height: auto !important;
                 box-shadow: none !important;
                 margin: 0 !important;
-                padding: 5mm !important;
+                padding: 15mm !important;
                 border: none !important;
+                overflow: visible !important;
+                -webkit-box-decoration-break: clone;
+                box-decoration-break: clone;
             }
-            .question-block, tr, .descriptive-section {
+            .a4-sheet.page-border-enabled::after {
+                position: fixed;
+                inset: var(--page-border-inset);
+            }
+            /* جلوگیری از نصف شدن سوالات یا ردیف‌های جدول در مرز صفحات چاپ */
+            .question-block, tr {
                 break-inside: avoid;
                 page-break-inside: avoid;
             }
-        }
+            .math-position-handle {
+                display: none !important;
+            }
+            .math-positioned-item {
+                cursor: default !important;
+                touch-action: auto !important;
+            }
+            .descriptive-section {
+                break-inside: auto !important;
+                page-break-inside: auto !important;
+            }
+            }
+            .math-positioned-item {
+                touch-action: none;
+            }
+            .math-position-handle {
+                position: absolute;
+                z-index: 5;
+                top: -1.35rem;
+                left: 0;
+                padding: 1px 5px;
+                border: 1px solid #67e8f9;
+                border-radius: 4px;
+                background: #ecfeff;
+                color: #155e75;
+                font: 10px sans-serif;
+                white-space: nowrap;
+                cursor: move;
+            }
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -180,12 +242,7 @@
                 <span class="hidden sm:inline">نمونه پیش‌فرض</span>
             </button>
 
-            <button onclick="downloadPDF()" id="pdf-btn" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-sm font-medium shadow-sm transition">
-                <i data-lucide="download" class="w-4 h-4"></i>
-                <span>دانلود PDF</span>
-            </button>
-
-            <button onclick="window.print()" class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition">
+            <button onclick="window.print()" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-sm font-medium shadow-sm transition">
                 <i data-lucide="printer" class="w-4 h-4"></i>
                 <span>چاپ / ذخیره PDF</span>
             </button>
@@ -307,6 +364,28 @@
                             </div>
                             <input type="range" id="inp-font-size" min="11" max="17" step="1" value="13" oninput="updateGlobalSettings()" class="w-full accent-blue-600 cursor-pointer">
                         </div>
+
+                        <div class="border-t border-blue-200 pt-3 space-y-2">
+                            <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                                <input type="checkbox" id="chk-page-border" onchange="updateGlobalSettings()" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                <span>نمایش کادر دور صفحه در پیش‌نمایش و چاپ</span>
+                            </label>
+                            <select id="inp-page-border-style" onchange="updateGlobalSettings()" disabled class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-400">
+                                <option value="solid">ساده</option>
+                                <option value="double">دوخطی</option>
+                                <option value="dashed">چین‌چین</option>
+                            </select>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="block text-xs font-medium text-slate-700">
+                                    فاصله از لبه (میلی‌متر)
+                                    <input type="number" id="inp-page-border-inset" min="0" max="30" step="0.5" onchange="updateGlobalSettings()" class="mt-1 w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                                </label>
+                                <label class="block text-xs font-medium text-slate-700">
+                                    ضخامت کادر (میلی‌متر)
+                                    <input type="number" id="inp-page-border-width" min="0.5" max="5" step="0.5" onchange="updateGlobalSettings()" class="mt-1 w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -315,7 +394,7 @@
                     <!-- دکمه‌های افزودن سوال جدید -->
                     <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200">
                         <p class="text-xs font-semibold text-slate-600 mb-2">افزودن سوال جدید:</p>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             <button onclick="addQuestion('descriptive')" class="flex flex-col items-center justify-center gap-1 bg-white hover:bg-blue-50 hover:border-blue-300 text-slate-700 border border-slate-200 p-2.5 rounded-xl text-xs font-medium transition shadow-sm">
                                 <i data-lucide="align-right" class="w-4 h-4 text-blue-600"></i>
                                 <span>تشریحی</span>
@@ -331,6 +410,14 @@
                             <button onclick="addQuestion('tf')" class="flex flex-col items-center justify-center gap-1 bg-white hover:bg-purple-50 hover:border-purple-300 text-slate-700 border border-slate-200 p-2.5 rounded-xl text-xs font-medium transition shadow-sm">
                                 <i data-lucide="help-circle" class="w-4 h-4 text-purple-600"></i>
                                 <span>صحیح / غلط</span>
+                            </button>
+                            <button onclick="addQuestion('matching')" class="flex flex-col items-center justify-center gap-1 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 border border-slate-200 p-2.5 rounded-xl text-xs font-medium transition shadow-sm">
+                                <i data-lucide="combine" class="w-4 h-4 text-indigo-600"></i>
+                                <span>وصل‌کردنی</span>
+                            </button>
+                            <button onclick="addQuestion('math')" class="flex flex-col items-center justify-center gap-1 bg-white hover:bg-cyan-50 hover:border-cyan-300 text-slate-700 border border-slate-200 p-2.5 rounded-xl text-xs font-medium transition shadow-sm">
+                                <i data-lucide="sigma" class="w-4 h-4 text-cyan-600"></i>
+                                <span>سوال ریاضی</span>
                             </button>
                         </div>
                     </div>
@@ -432,7 +519,11 @@
             settings: {
                 globalSpacing: 16,
                 lineStyle: 'lined',
-                fontSize: 13
+                fontSize: 13,
+                pageBorder: false,
+                pageBorderStyle: 'solid',
+                pageBorderInset: 5,
+                pageBorderWidth: 1
             },
             questions: [
                 {
@@ -509,11 +600,54 @@
             }
         };
 
-        // کلید ذخیره‌سازی در localStorage
+        // کلید جدید در localStorage تا با نسخه قبلی تداخل نداشته باشد
         const STORAGE_KEY = 'descriptive_exam_builder_v2';
 
         let appState = JSON.parse(JSON.stringify(defaultState));
         let isMobilePreview = false;
+
+        function createQuestionImage(src) {
+            return {
+                id: `image-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                src,
+                width: 100,
+                height: 0,
+                cropX: 50,
+                cropY: 50,
+                align: 'center'
+            };
+        }
+
+        function normalizeQuestionImages(question) {
+            const existingImages = Array.isArray(question.images)
+                ? question.images
+                : question.image ? [question.image] : [];
+
+            question.images = existingImages
+                .map((image, index) => {
+                    const normalizedImage = typeof image === 'string'
+                        ? createQuestionImage(image)
+                        : image && typeof image === 'object' && typeof image.src === 'string'
+                            ? image
+                            : null;
+                    if (!normalizedImage) return null;
+
+                    return {
+                        id: normalizedImage.id || `image-${Date.now()}-${index}`,
+                        src: normalizedImage.src,
+                        width: Math.min(100, Math.max(10, Number(normalizedImage.width) || 100)),
+                        height: Math.min(160, Math.max(0, Number(normalizedImage.height) || 0)),
+                        cropX: Math.min(100, Math.max(0, Number(normalizedImage.cropX ?? 50))),
+                        cropY: Math.min(100, Math.max(0, Number(normalizedImage.cropY ?? 50))),
+                        align: ['right', 'center', 'left'].includes(normalizedImage.align)
+                            ? normalizedImage.align
+                            : 'center'
+                    };
+                })
+                .filter(Boolean);
+
+            delete question.image;
+        }
 
         // بارگذاری اطلاعات ذخیره‌شده از حافظه مرورگر در صورت وجود
         function loadFromStorage() {
@@ -523,6 +657,8 @@
                     const parsed = JSON.parse(saved);
                     if (parsed && parsed.meta && parsed.questions && parsed.descriptive) {
                         appState = parsed;
+                        appState.settings = { ...defaultState.settings, ...parsed.settings };
+                        appState.questions.forEach(normalizeQuestionImages);
                     }
                 }
             } catch (e) {
@@ -534,8 +670,10 @@
         function saveToStorage() {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+                return true;
             } catch (e) {
                 console.warn('خطا در ذخیره‌سازی اطلاعات:', e);
+                return false;
             }
         }
 
@@ -558,6 +696,15 @@
             return num.toString().replace(/\d/g, x => persianDigits[x]);
         }
 
+        function toPersianMathDigits(value) {
+            const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+            return String(value).replace(/[0-9٠-٩]/g, digit => {
+                const index = digit >= '٠' && digit <= '٩' ? digit.charCodeAt(0) - '٠'.charCodeAt(0)
+                    : digit.charCodeAt(0) - '0'.charCodeAt(0);
+                return persianDigits[index];
+            });
+        }
+
         // فرار از کاراکترهای خطرناک HTML در ورودی‌های متنی
         function escapeHtml(str) {
             if (!str) return '';
@@ -572,6 +719,7 @@
         // بازنشانی به نمونه پیش‌فرض
         function resetToSample() {
             appState = JSON.parse(JSON.stringify(defaultState));
+            appState.questions.forEach(normalizeQuestionImages);
             saveToStorage();
             populateInputsFromState();
             renderQuestionsEditor();
@@ -633,6 +781,11 @@
             document.getElementById('inp-line-style').value = appState.settings.lineStyle;
             document.getElementById('inp-font-size').value = appState.settings.fontSize;
             document.getElementById('font-size-val').textContent = appState.settings.fontSize + ' پیکسل';
+            document.getElementById('chk-page-border').checked = !!appState.settings.pageBorder;
+            document.getElementById('inp-page-border-style').value = appState.settings.pageBorderStyle;
+            document.getElementById('inp-page-border-style').disabled = !appState.settings.pageBorder;
+            document.getElementById('inp-page-border-inset').value = appState.settings.pageBorderInset;
+            document.getElementById('inp-page-border-width').value = appState.settings.pageBorderWidth;
 
             document.getElementById('chk-enable-descriptive').checked = !!appState.descriptive.enabled;
             document.getElementById('inp-desc-title').value = appState.descriptive.title || '';
@@ -662,13 +815,32 @@
             const spacing = parseInt(document.getElementById('inp-global-spacing').value, 10);
             const lineStyle = document.getElementById('inp-line-style').value;
             const fontSize = parseInt(document.getElementById('inp-font-size').value, 10);
+            const pageBorder = document.getElementById('chk-page-border').checked;
+            const pageBorderStyle = document.getElementById('inp-page-border-style').value;
+            const pageBorderInsetInput = document.getElementById('inp-page-border-inset');
+            const pageBorderWidthInput = document.getElementById('inp-page-border-width');
+            const pageBorderInsetValue = Number(pageBorderInsetInput.value);
+            const pageBorderWidthValue = Number(pageBorderWidthInput.value);
+            const pageBorderInset = pageBorderInsetInput.value.trim() && Number.isFinite(pageBorderInsetValue)
+                ? Math.min(30, Math.max(0, pageBorderInsetValue))
+                : appState.settings.pageBorderInset;
+            const pageBorderWidth = pageBorderWidthInput.value.trim() && Number.isFinite(pageBorderWidthValue)
+                ? Math.min(5, Math.max(0.5, pageBorderWidthValue))
+                : appState.settings.pageBorderWidth;
 
             appState.settings.globalSpacing = spacing;
             appState.settings.lineStyle = lineStyle;
             appState.settings.fontSize = fontSize;
+            appState.settings.pageBorder = pageBorder;
+            appState.settings.pageBorderStyle = pageBorderStyle;
+            appState.settings.pageBorderInset = pageBorderInset;
+            appState.settings.pageBorderWidth = pageBorderWidth;
 
             document.getElementById('global-spacing-val').textContent = spacing + ' پیکسل';
             document.getElementById('font-size-val').textContent = fontSize + ' پیکسل';
+            document.getElementById('inp-page-border-style').disabled = !pageBorder;
+            pageBorderInsetInput.value = pageBorderInset;
+            pageBorderWidthInput.value = pageBorderWidth;
             saveToStorage();
             renderPaper();
         }
@@ -682,7 +854,7 @@
                 text: '',
                 skill: '',
                 extraSpace: type === 'descriptive' ? 70 : 12,
-                image: null,
+                images: [],
                 options: []
             };
 
@@ -695,6 +867,19 @@
                 newQ.text = 'جمله دارای جای خالی را بنویسید: .................';
             } else if (type === 'tf') {
                 newQ.text = 'درستی یا نادرستی عبارت زیر را مشخص کنید:\nالف) عبارت نمونه اول';
+            } else if (type === 'matching') {
+                newQ.text = 'موارد ستون الف را به گزینه مناسب در ستون ب وصل کنید.';
+                newQ.matching = {
+                    leftItems: ['مورد اول', 'مورد دوم', 'مورد سوم'],
+                    rightItems: ['گزینه اول', 'گزینه دوم', 'گزینه سوم']
+                };
+            } else if (type === 'math') {
+                newQ.text = 'صورت مسئله ریاضی را اینجا بنویسید.';
+                newQ.extraSpace = 70;
+                newQ.math = {
+                    components: [],
+                    answerType: 'steps'
+                };
             }
 
             appState.questions.push(newQ);
@@ -753,24 +938,760 @@
             renderPaper();
         }
 
-        // بارگذاری تصویر برای سوال
-        function handleImageUpload(index, event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                appState.questions[index].image = e.target.result;
-                saveToStorage();
-                renderQuestionsEditor();
-                renderPaper();
-                showToast('تصویر به سوال اضافه شد.');
-            };
-            reader.readAsDataURL(file);
+        function updateMatchingItem(qIndex, column, itemIndex, value) {
+            const items = appState.questions[qIndex]?.matching?.[column];
+            if (!items || itemIndex < 0 || itemIndex >= items.length) return;
+            items[itemIndex] = value;
+            saveToStorage();
+            renderPaper();
         }
 
-        // حذف تصویر سوال
-        function removeQuestionImage(index) {
-            appState.questions[index].image = null;
+        function addMatchingItem(qIndex, column) {
+            const items = appState.questions[qIndex]?.matching?.[column];
+            if (!items) return;
+            items.push('');
+            saveToStorage();
+            renderQuestionsEditor();
+            renderPaper();
+        }
+
+        function removeMatchingItem(qIndex, column, itemIndex) {
+            const items = appState.questions[qIndex]?.matching?.[column];
+            if (!items || items.length <= 1 || itemIndex < 0 || itemIndex >= items.length) return;
+            items.splice(itemIndex, 1);
+            saveToStorage();
+            renderQuestionsEditor();
+            renderPaper();
+        }
+
+        function ensureMathTools(question) {
+            question.math ||= {};
+            question.math.answerType ||= 'steps';
+            if (Array.isArray(question.math.components)) {
+                question.math.components.forEach(normalizeMathComponent);
+                return;
+            }
+
+            const math = question.math;
+            const components = [];
+            const formulas = Array.isArray(math.formulas) ? math.formulas : [math.formula || ''];
+            formulas.filter(formula => String(formula).trim()).forEach(expression => {
+                components.push(createMathComponent('formula', { expression }, 5, nextMathComponentY(components), 45));
+            });
+            [
+                ['numberLine', 'numberLine', 85],
+                ['geometry', 'geometry', 65],
+                ['arithmetic', 'arithmetic', 32],
+                ['dataTable', 'dataTable', 100],
+                ['chart', 'chart', 75]
+            ].forEach(([legacyKey, type, width]) => {
+                const legacy = math[legacyKey];
+                if (legacy && legacy.enabled) {
+                    components.push(createMathComponent(type, { ...legacy }, 5, nextMathComponentY(components), width));
+                }
+            });
+            math.components = components;
+            math.components.forEach(normalizeMathComponent);
+            question.math.answerType ||= 'steps';
+        }
+
+        const mathComponentTypes = {
+            formula: 'فرمول',
+            numberLine: 'محور اعداد',
+            geometry: 'شکل / صفحه مختصات',
+            arithmetic: 'عملیات ستونی',
+            dataTable: 'جدول داده',
+            chart: 'نمودار ستونی'
+        };
+
+        function mathComponentDefaultData(type) {
+            const defaults = {
+                formula: { expression: '' },
+                numberLine: { start: 0, end: 10, step: 1, points: '' },
+                geometry: { shape: 'triangle', labels: 'A, B, C', xMin: -5, xMax: 5, yMin: -5, yMax: 5, gridStep: 1, coordinates: '' },
+                arithmetic: { lines: '' },
+                dataTable: { content: 'عنوان ستون ۱\tعنوان ستون ۲\nداده ۱\tداده ۲' },
+                chart: { content: 'دسته ۱, ۴\nدسته ۲, ۷\nدسته ۳, ۵' }
+            };
+            return defaults[type] ? { ...defaults[type] } : null;
+        }
+
+        function mathComponentEstimatedHeight(component) {
+            if (component.type === 'arithmetic') {
+                const lineCount = String(component.data?.lines || '').split(/\r?\n/).filter(line => line.trim()).length;
+                return Math.max(26, lineCount * 8 + 5);
+            }
+            return { formula: 24, numberLine: 24, geometry: 62, dataTable: 32, chart: 44 }[component.type] || 24;
+        }
+
+        function nextMathComponentY(components) {
+            return components.reduce((bottom, component) => Math.max(bottom, component.y + mathComponentEstimatedHeight(component) + 4), 0);
+        }
+
+        function createMathComponent(type, data, x, y, width) {
+            const defaults = mathComponentDefaultData(type);
+            if (!defaults) return null;
+            const resolvedWidth = Math.min(100, Math.max(10, Number.isFinite(width) ? width : 70));
+            return {
+                id: `math-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+                type,
+                data: { ...defaults, ...data },
+                x: Math.min(100 - resolvedWidth, Math.max(0, Number.isFinite(x) ? x : 5)),
+                y: Number.isFinite(y) ? y : 0,
+                width: resolvedWidth
+            };
+        }
+
+        function normalizeMathComponent(component) {
+            if (!component || !mathComponentDefaultData(component.type)) return;
+            if (typeof component.id !== 'string' || !/^math-[a-z0-9-]+$/.test(component.id)) {
+                component.id = `math-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+            }
+            component.data = { ...mathComponentDefaultData(component.type), ...(component.data || {}) };
+            if (component.type === 'arithmetic' && !component.data.lines && (component.data.first || component.data.second)) {
+                const operators = { add: '+', subtract: '−', multiply: '×', divide: '÷' };
+                const first = component.data.operation === 'divide' ? component.data.second : component.data.first;
+                const second = component.data.operation === 'divide' ? component.data.first : component.data.second;
+                component.data.lines = [first, `${operators[component.data.operation] || '+'} ${second}`].filter(line => line.trim()).join('\n');
+                delete component.data.first;
+                delete component.data.second;
+                delete component.data.operation;
+            }
+            component.y = Number.isFinite(Number(component.y)) ? Math.min(1000, Math.max(0, Number(component.y))) : 0;
+            component.width = Number.isFinite(Number(component.width)) ? Math.min(100, Math.max(10, Number(component.width))) : 70;
+            component.x = Number.isFinite(Number(component.x)) ? Math.min(100 - component.width, Math.max(0, Number(component.x))) : 5;
+        }
+
+        function addMathComponent(questionIndex, type) {
+            const question = appState.questions[questionIndex];
+            if (!question || !mathComponentDefaultData(type)) return;
+            ensureMathTools(question);
+            const widths = { formula: 45, numberLine: 85, geometry: 65, arithmetic: 32, dataTable: 100, chart: 75 };
+            const component = createMathComponent(type, {}, 5, nextMathComponentY(question.math.components), widths[type]);
+            question.math.components.push(component);
+            saveToStorage();
+            renderQuestionsEditor();
+            renderPaper();
+        }
+
+        function removeMathComponent(questionIndex, componentId) {
+            const question = appState.questions[questionIndex];
+            if (!question) return;
+            ensureMathTools(question);
+            const index = question.math.components.findIndex(component => component.id === componentId);
+            if (index < 0) return;
+            question.math.components.splice(index, 1);
+            saveToStorage();
+            renderQuestionsEditor();
+            renderPaper();
+        }
+
+        function updateMathComponent(questionIndex, componentId, field, value, rerenderEditor = false) {
+            const question = appState.questions[questionIndex];
+            if (!question) return;
+            ensureMathTools(question);
+            const component = question.math.components.find(item => item.id === componentId);
+            if (!component) return;
+
+            if (field === 'x' || field === 'y' || field === 'width') {
+                const number = normalizeMathNumber(value);
+                if (number === null) return;
+                component[field] = field === 'x'
+                    ? Math.min(100 - component.width, Math.max(0, number))
+                    : field === 'y'
+                        ? Math.min(1000, Math.max(0, number))
+                        : Math.min(100, Math.max(10, number));
+                if (field === 'width') component.x = Math.min(component.x, 100 - component.width);
+            } else {
+                const data = component.data;
+                if (component.type === 'numberLine' && ['start', 'end', 'step'].includes(field)) {
+                    const number = normalizeMathNumber(value);
+                    if (number === null) return;
+                    data[field] = field === 'step' ? Math.min(1000, Math.max(0.01, number)) : Math.min(100000, Math.max(-100000, number));
+                } else if (component.type === 'geometry' && field === 'shape' && ['triangle', 'square', 'rectangle', 'circle', 'angle', 'coordinate-plane'].includes(value)) {
+                    data.shape = value;
+                    rerenderEditor = true;
+                } else if (component.type === 'geometry' && ['xMin', 'xMax', 'yMin', 'yMax', 'gridStep'].includes(field)) {
+                    const number = normalizeMathNumber(value);
+                    if (number === null || (field === 'gridStep' && number <= 0)) return;
+                    data[field] = field === 'gridStep' ? Math.min(1000, number) : Math.min(100000, Math.max(-100000, number));
+                } else if (
+                    (component.type === 'formula' && field === 'expression') ||
+                    (component.type === 'numberLine' && field === 'points') ||
+                    (component.type === 'geometry' && ['labels', 'coordinates'].includes(field)) ||
+                    (component.type === 'arithmetic' && field === 'lines') ||
+                    (['dataTable', 'chart'].includes(component.type) && field === 'content')
+                ) {
+                    data[field] = value;
+                } else {
+                    return;
+                }
+            }
+
+            saveToStorage();
+            if (['x', 'y', 'width'].includes(field)) {
+                ['x', 'y', 'width'].forEach(positionField => {
+                    const input = document.getElementById(`math-position-${questionIndex}-${component.id}-${positionField}`);
+                    if (input) input.value = component[positionField];
+                });
+            }
+            if (rerenderEditor) renderQuestionsEditor();
+            renderPaper();
+        }
+
+        function insertMathComponentSnippet(questionIndex, componentId, snippet, input, cursorOffset = snippet.length) {
+            const start = input.selectionStart ?? input.value.length;
+            const end = input.selectionEnd ?? start;
+            input.value = input.value.slice(0, start) + snippet + input.value.slice(end);
+            updateMathComponent(questionIndex, componentId, 'expression', input.value);
+            input.focus();
+            const cursor = start + Math.min(cursorOffset, snippet.length);
+            input.setSelectionRange(cursor, cursor);
+        }
+
+        function renderMathComponentEditor(questionIndex, component) {
+            const id = component.id;
+            const data = component.data;
+            const fieldInput = (field, label, value, options = {}) => `
+                <label class="block text-[10px] text-slate-600">${label}
+                    <input ${['x', 'y', 'width'].includes(field) ? `id="math-position-${questionIndex}-${id}-${field}"` : ''} type="${options.type || 'text'}" ${options.dir ? `dir="${options.dir}"` : ''} value="${escapeHtml(String(value))}" ${options.placeholder ? `placeholder="${options.placeholder}"` : ''}
+                        ${options.min !== undefined ? `min="${options.min}"` : ''} ${options.max !== undefined ? `max="${options.max}"` : ''} ${options.step !== undefined ? `step="${options.step}"` : ''}
+                        onchange="updateMathComponent(${questionIndex}, '${id}', '${field}', this.value${options.rerender ? ', true' : ''})"
+                        class="mt-1 w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md">
+                </label>`;
+            const textArea = (field, label, value, placeholder, rows = 3, dir = 'auto') => `
+                <label class="block text-[10px] text-slate-600">${label}
+                    <textarea rows="${rows}" dir="${dir}" oninput="updateMathComponent(${questionIndex}, '${id}', '${field}', this.value)" placeholder="${placeholder}"
+                        class="mt-1 w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md">${escapeHtml(value || '')}</textarea>
+                </label>`;
+            let content = '';
+
+            if (component.type === 'formula') {
+                const inputId = `math-expression-${questionIndex}-${id}`;
+                content = `
+                    <textarea id="${inputId}" dir="ltr" oninput="updateMathComponent(${questionIndex}, '${id}', 'expression', this.value)" placeholder="مثال: \\frac{3}{4} + x^{2}" class="w-full min-h-16 px-2.5 py-2 text-sm font-mono bg-white border border-slate-300 rounded-lg outline-none focus:border-cyan-500">${escapeHtml(data.expression || '')}</textarea>
+                    <div class="flex flex-wrap gap-1">
+                        ${[['کسر', '\\frac{}{}', 6], ['توان', '^{ }', 2], ['ریشه', '\\sqrt{}', 6], ['×', '\\times ', 7], ['÷', '\\div ', 6], ['π', '\\pi ', 4], ['≤', '\\le ', 4], ['≥', '\\ge ', 4]].map(([label, snippet, cursorOffset]) => `
+                            <button type="button" data-math-snippet="${escapeHtml(snippet)}" data-cursor-offset="${cursorOffset}" onclick="insertMathComponentSnippet(${questionIndex}, '${id}', this.dataset.mathSnippet, document.getElementById('${inputId}'), Number(this.dataset.cursorOffset))" class="px-2 py-1 text-[11px] bg-white border border-slate-200 rounded-md hover:bg-cyan-100">${label}</button>
+                        `).join('')}
+                    </div>`;
+            } else if (component.type === 'numberLine') {
+                content = `
+                    <div class="grid grid-cols-3 gap-2">${fieldInput('start', 'شروع', data.start)}${fieldInput('end', 'پایان', data.end)}${fieldInput('step', 'گام', data.step)}</div>
+                    ${textArea('points', 'نقاط مشخص‌شده', data.points, 'مثال: ۲، ۴٫۵، ۸', 2)}`;
+            } else if (component.type === 'geometry') {
+                content = `
+                    <select onchange="updateMathComponent(${questionIndex}, '${id}', 'shape', this.value, true)" class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white">
+                        ${[['triangle','مثلث'],['square','مربع'],['rectangle','مستطیل'],['circle','دایره و شعاع'],['angle','زاویه'],['coordinate-plane','صفحه مختصات']].map(([value,label]) => `<option value="${value}" ${data.shape === value ? 'selected' : ''}>${label}</option>`).join('')}
+                    </select>
+                    ${fieldInput('labels', 'برچسب‌ها (با ویرگول جدا کنید)', data.labels)}
+                    ${data.shape === 'coordinate-plane' ? `
+                        <div class="grid grid-cols-3 gap-2">${[['xMin','کمینهٔ x'],['xMax','بیشینهٔ x'],['yMin','کمینهٔ y'],['yMax','بیشینهٔ y'],['gridStep','گام شبکه']].map(([field,label]) => fieldInput(field,label,data[field],{dir:'ltr'})).join('')}</div>
+                        ${textArea('coordinates', 'نقاط؛ هر خط به‌شکل A(2,3) یا 2,3', data.coordinates, 'A(2,3)&#10;B(-1,4)', 3, 'ltr')}` : ''}`;
+            } else if (component.type === 'arithmetic') {
+                content = `
+                    ${textArea('lines', 'برای عدد مرکب، خط اول برچسب ستون‌ها و خط‌های بعدی داده‌هاست', data.lines, 'ساعت دقیقه\n۲ ۳۵\n+ ۱ ۴۵', 5, 'ltr')}
+                    <p class="text-[10px] text-slate-500">مثال: «ساعت دقیقه ثانیه» در خط اول و سپس «۲ ۳۵ ۱۰» و «+ ۱ ۴۵ ۵». جداکننده می‌تواند فاصله، ویرگول یا دونقطه باشد.</p>
+                    <p class="text-[10px] text-slate-500">بدون ردیف برچسب نیز قالب‌های «۲ ساعت و ۳۵ دقیقه» و «۲:۳۵» پذیرفته می‌شوند.</p>
+                    <p class="text-[10px] text-slate-500">علامت‌های +، −، ×، ÷ و * پذیرفته می‌شوند. هر تعداد خط وارد کنید؛ پاسخ محاسبه نمی‌شود.</p>`;
+            } else if (component.type === 'dataTable') {
+                content = textArea('content', 'هر ردیف در یک خط و ستون‌ها با Tab جدا شوند', data.content, 'عنوان ستون ۱&#9;عنوان ستون ۲', 4);
+            } else if (component.type === 'chart') {
+                content = textArea('content', 'هر خط: برچسب، مقدار', data.content, 'سیب، ۴', 4);
+            }
+
+            return `
+                <div class="bg-white border border-cyan-100 rounded-lg p-2.5 space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-semibold text-slate-700">${mathComponentTypes[component.type]}</span>
+                        <button type="button" onclick="removeMathComponent(${questionIndex}, '${id}')" class="px-2 py-1 text-[10px] text-rose-600 hover:bg-rose-50 rounded">حذف جزء</button>
+                    </div>
+                    ${content}
+                    <div class="grid grid-cols-3 gap-2 border-t border-slate-100 pt-2">
+                        ${fieldInput('x', 'موقعیت افقی (%)', component.x, {type:'number',min:0,max:100,step:0.1,dir:'ltr'})}
+                        ${fieldInput('y', 'موقعیت عمودی (میلی‌متر)', component.y, {type:'number',min:0,max:1000,step:0.5,dir:'ltr'})}
+                        ${fieldInput('width', 'عرض (%)', component.width, {type:'number',min:10,max:100,step:1,dir:'ltr'})}
+                    </div>
+                </div>`;
+        }
+
+        function updateMathField(questionIndex, path, value) {
+            const question = appState.questions[questionIndex];
+            if (!question || path !== 'answerType' || !['steps', 'numeric', 'fill', 'draw'].includes(value)) return;
+            ensureMathTools(question);
+            question.math.answerType = value;
+
+            saveToStorage();
+            renderPaper();
+        }
+
+        function normalizeMathNumber(value) {
+            const latin = String(value)
+                .replace(/[۰-۹]/g, digit => '۰۱۲۳۴۵۶۷۸۹'.indexOf(digit))
+                .replace(/[٠-٩]/g, digit => '٠١٢٣٤٥٦٧٨٩'.indexOf(digit))
+                .replace(/[٫،,]/g, '.');
+            const number = Number(latin);
+            return Number.isFinite(number) ? number : null;
+        }
+
+        function formatMathNumber(value) {
+            return toPersianDigits(Number.isInteger(value) ? String(value) : Number(value.toFixed(3)).toString());
+        }
+
+        function renderMathExpression(expression) {
+            const tokenPattern = /\\(?:frac|sqrt|times|cdot|div|pi|le|ge|neq|pm)|\\[a-zA-Z]+|[0-9۰-۹٠-٩]+(?:[.,٫][0-9۰-۹٠-٩]+)?|[a-zA-Z]+|[+−\-*/=(){}^_<>≤≥≠±×÷π√]|./gu;
+            const tokens = String(expression).match(tokenPattern) || [];
+            let index = 0;
+
+            const tokenMarkup = token => {
+                const commands = {
+                    '\\times': '×', '\\cdot': '·', '\\div': '÷', '\\pi': 'π',
+                    '\\le': '≤', '\\ge': '≥', '\\neq': '≠', '\\pm': '±'
+                };
+                const value = commands[token] || token;
+                if (/^[0-9۰-۹٠-٩]+(?:[.,٫][0-9۰-۹٠-٩]+)?$/.test(value)) return `<mn>${escapeHtml(toPersianMathDigits(value))}</mn>`;
+                if (/^[a-zA-Z]+$/.test(value) || value === 'π') return `<mi>${escapeHtml(value)}</mi>`;
+                if (/^\s+$/.test(value)) return '';
+                if (/^[\u0600-\u06FF]+$/u.test(value)) return `<mtext>${escapeHtml(value)}</mtext>`;
+                if (['\\frac', '\\sqrt'].includes(token)) return `<mtext>${escapeHtml(token)}</mtext>`;
+                return `<mo>${escapeHtml(value)}</mo>`;
+            };
+
+            const parseGroup = () => {
+                if (tokens[index] === '{') {
+                    index++;
+                    const content = parseSequence(true);
+                    if (tokens[index] === '}') index++;
+                    return `<mrow>${content}</mrow>`;
+                }
+                return tokenMarkup(tokens[index++] || '');
+            };
+
+            const parseSequence = inGroup => {
+                const nodes = [];
+                while (index < tokens.length) {
+                    const token = tokens[index];
+                    if (token === '}' && inGroup) break;
+
+                    if (token === '\\frac') {
+                        index++;
+                        nodes.push(`<mfrac>${parseGroup()}${parseGroup()}</mfrac>`);
+                        continue;
+                    }
+                    if (token === '\\sqrt') {
+                        index++;
+                        nodes.push(`<msqrt>${parseGroup()}</msqrt>`);
+                        continue;
+                    }
+                    if ((token === '^' || token === '_') && nodes.length) {
+                        index++;
+                        const base = nodes.pop();
+                        const script = parseGroup();
+                        const tag = token === '^' ? 'msup' : 'msub';
+                        nodes.push(`<${tag}>${base}${script}</${tag}>`);
+                        continue;
+                    }
+                    if (token === '{') {
+                        nodes.push(parseGroup());
+                        continue;
+                    }
+                    index++;
+                    nodes.push(tokenMarkup(token));
+                }
+                return nodes.filter(Boolean).join('');
+            };
+
+            return `<math xmlns="http://www.w3.org/1998/Math/MathML" dir="ltr" display="block"><mrow>${parseSequence(false)}</mrow></math>`;
+        }
+
+        function renderNumberLine(tool) {
+            const start = normalizeMathNumber(tool.start);
+            const end = normalizeMathNumber(tool.end);
+            const step = normalizeMathNumber(tool.step);
+            if (start === null || end === null || step === null || end <= start || step <= 0) {
+                return '<p class="text-xs text-rose-600">بازهٔ محور و گام را بررسی کنید؛ انتهای بازه باید از ابتدا بزرگ‌تر باشد.</p>';
+            }
+
+            const tickCount = Math.floor((end - start) / step);
+            if (tickCount > 40) {
+                return '<p class="text-xs text-rose-600">برای خوانایی محور، فاصلهٔ گام را بیشتر کنید تا حداکثر ۴۰ نشانه نمایش داده شود.</p>';
+            }
+            const xFor = value => 24 + ((value - start) / (end - start)) * 592;
+            const ticks = Array.from({ length: tickCount + 1 }, (_, tickIndex) => {
+                const value = start + tickIndex * step;
+                const x = xFor(value);
+                return `<line x1="${x}" y1="43" x2="${x}" y2="57" stroke="#334155" stroke-width="1.5"/><text x="${x}" y="77" text-anchor="middle" font-size="12" fill="#334155">${escapeHtml(formatMathNumber(value))}</text>`;
+            }).join('');
+            const points = String(tool.points || '').split(/[,،\s]+/).map(normalizeMathNumber).filter(value => value !== null && value >= start && value <= end);
+            const markers = points.map(value => {
+                const x = xFor(value);
+                return `<circle cx="${x}" cy="50" r="5" fill="#2563eb"/><text x="${x}" y="25" text-anchor="middle" font-size="12" fill="#1d4ed8">${escapeHtml(formatMathNumber(value))}</text>`;
+            }).join('');
+
+            return `<svg viewBox="0 0 640 90" role="img" aria-label="محور اعداد" class="w-full max-w-2xl mx-auto"><line x1="20" y1="50" x2="620" y2="50" stroke="#334155" stroke-width="2"/><path d="M20 50l10-6v12zM620 50l-10-6v12z" fill="#334155"/>${ticks}${markers}</svg>`;
+        }
+
+        function renderGeometry(tool) {
+            const labels = String(tool.labels || '').split(/[,،\n]+/).map(label => label.trim()).filter(Boolean);
+            const label = (index, x, y) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="18" fill="#0f172a">${labels[index] ? escapeHtml(toPersianMathDigits(labels[index])) : ''}</text>`;
+            if (tool.shape === 'coordinate-plane') {
+                const xMin = normalizeMathNumber(tool.xMin);
+                const xMax = normalizeMathNumber(tool.xMax);
+                const yMin = normalizeMathNumber(tool.yMin);
+                const yMax = normalizeMathNumber(tool.yMax);
+                const step = normalizeMathNumber(tool.gridStep);
+                if ([xMin, xMax, yMin, yMax, step].some(value => value === null) ||
+                    xMax <= xMin || yMax <= yMin || step <= 0 ||
+                    (xMax - xMin) / step > 40 || (yMax - yMin) / step > 40) {
+                    return '<p class="text-xs text-rose-600">بازه‌های صفحه مختصات را بررسی کنید؛ هر محور باید حداکثر ۴۰ فاصله داشته باشد.</p>';
+                }
+
+                const left = 80, right = 560, top = 35, bottom = 365;
+                const xFor = value => left + ((value - xMin) / (xMax - xMin)) * (right - left);
+                const yFor = value => bottom - ((value - yMin) / (yMax - yMin)) * (bottom - top);
+                const xTicks = Array.from({ length: Math.floor((xMax - xMin) / step) + 1 }, (_, i) => xMin + i * step);
+                const yTicks = Array.from({ length: Math.floor((yMax - yMin) / step) + 1 }, (_, i) => yMin + i * step);
+                const grid = [
+                    ...xTicks.map(value => `<line x1="${xFor(value)}" y1="${top}" x2="${xFor(value)}" y2="${bottom}" stroke="#cbd5e1"/><text x="${xFor(value)}" y="${Math.min(bottom - 4, Math.max(top + 13, yFor(0) + 18))}" text-anchor="middle" font-size="11" fill="#475569">${escapeHtml(formatMathNumber(value))}</text>`),
+                    ...yTicks.map(value => `<line x1="${left}" y1="${yFor(value)}" x2="${right}" y2="${yFor(value)}" stroke="#cbd5e1"/><text x="${Math.min(right - 3, Math.max(left + 3, xFor(0) - 7))}" y="${yFor(value) - 4}" text-anchor="end" font-size="11" fill="#475569">${escapeHtml(formatMathNumber(value))}</text>`)
+                ].join('');
+                const xAxisY = yMin <= 0 && yMax >= 0 ? yFor(0) : (yMin > 0 ? bottom : top);
+                const yAxisX = xMin <= 0 && xMax >= 0 ? xFor(0) : (xMin > 0 ? left : right);
+                const points = String(tool.coordinates || '').split(/\r?\n/).map((line, pointIndex) => {
+                    const number = '[+-]?[0-9۰-۹٠-٩]+(?:[٫.,][0-9۰-۹٠-٩]+)?';
+                    const labeled = line.match(new RegExp(`^\\s*(.*?)\\s*\\(\\s*(${number})\\s*[,،]\\s*(${number})\\s*\\)\\s*$`));
+                    const plain = line.match(new RegExp(`^\\s*(.*?)\\s*[:=]\\s*(${number})\\s*[,،]\\s*(${number})\\s*$`))
+                        || line.match(new RegExp(`^\\s*(${number})\\s*[,،]\\s*(${number})\\s*$`));
+                    const match = labeled || plain;
+                    if (!match) return '';
+                    const name = labeled ? match[1].trim() : (plain.length === 4 ? match[1].trim() : '');
+                    const x = normalizeMathNumber(labeled ? match[2] : (plain.length === 4 ? match[2] : match[1]));
+                    const y = normalizeMathNumber(labeled ? match[3] : (plain.length === 4 ? match[3] : match[2]));
+                    if (x === null || y === null || x < xMin || x > xMax || y < yMin || y > yMax) return '';
+                    const pointLabel = toPersianMathDigits(name || `P${pointIndex + 1}`);
+                    return `<circle cx="${xFor(x)}" cy="${yFor(y)}" r="5" fill="#2563eb"/><text x="${xFor(x) + 8}" y="${yFor(y) - 8}" font-size="13" fill="#1d4ed8">${escapeHtml(pointLabel)}</text>`;
+                }).join('');
+                const xLabel = labels[0] || 'x', yLabel = labels[1] || 'y';
+                return `<svg viewBox="0 0 640 400" role="img" aria-label="صفحه مختصات" class="w-full max-w-xl mx-auto">${grid}<line x1="${left}" y1="${xAxisY}" x2="${right}" y2="${xAxisY}" stroke="#334155" stroke-width="2"/><line x1="${yAxisX}" y1="${top}" x2="${yAxisX}" y2="${bottom}" stroke="#334155" stroke-width="2"/><text x="${right - 4}" y="${xAxisY - 8}" text-anchor="end" font-size="14" fill="#0f172a">${escapeHtml(toPersianMathDigits(xLabel))}</text><text x="${yAxisX + 8}" y="${top + 14}" font-size="14" fill="#0f172a">${escapeHtml(toPersianMathDigits(yLabel))}</text>${points}</svg>`;
+            }
+            const shapes = {
+                triangle: `<polygon points="320,35 130,300 510,300" fill="#eff6ff" stroke="#1d4ed8" stroke-width="4"/>${label(0, 320, 25)}${label(1, 115, 320)}${label(2, 525, 320)}`,
+                square: `<rect x="190" y="70" width="260" height="260" fill="#eff6ff" stroke="#1d4ed8" stroke-width="4"/>${label(0, 180, 65)}${label(1, 460, 65)}${label(2, 460, 355)}${label(3, 180, 355)}`,
+                rectangle: `<rect x="120" y="105" width="400" height="190" fill="#eff6ff" stroke="#1d4ed8" stroke-width="4"/>${label(0, 110, 100)}${label(1, 530, 100)}${label(2, 530, 320)}${label(3, 110, 320)}`,
+                circle: `<circle cx="320" cy="200" r="125" fill="#eff6ff" stroke="#1d4ed8" stroke-width="4"/><line x1="320" y1="200" x2="445" y2="200" stroke="#475569" stroke-width="3"/>${label(0, 320, 55)}${label(1, 390, 188)}`,
+                angle: `<path d="M150 290h340M150 290V70M150 290A220 220 0 0 1 305 135" fill="none" stroke="#1d4ed8" stroke-width="4"/>${label(0, 135, 320)}${label(1, 505, 310)}${label(2, 140, 55)}`,
+            };
+            return `<svg viewBox="0 0 640 400" role="img" aria-label="شکل هندسی ${escapeHtml(tool.shape)}" class="w-full max-w-xl mx-auto">${shapes[tool.shape] || shapes.triangle}</svg>`;
+        }
+
+        function renderVerticalArithmetic(tool) {
+            const lines = String(tool.lines || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+            const digits = '[0-9۰-۹٠-٩]+';
+            const numberPattern = `(?:${digits}\\s+)?${digits}\\s*\\/\\s*${digits}|${digits}(?:[.,٫]${digits})?`;
+            const unitColumns = ['روز', 'ساعت', 'دقیقه', 'ثانیه'];
+            const unitAliases = { 'روز': 0, 'ساعت': 1, 'دقیقه': 2, 'ثانیه': 3 };
+            const splitColumns = line => /[\t|:،,;؛]/.test(line)
+                ? line.split(/[\t|:،,;؛]/).map(value => value.trim())
+                : line.trim().split(/\s+/);
+            const headerLabels = splitColumns(lines[0]);
+            const isNumber = value => new RegExp(`^(?:${digits}(?:[.,٫]${digits})?|${digits}\\s*\\/\\s*${digits})$`).test(value);
+            const hasHeader = lines.length >= 2 && headerLabels.length > 0 &&
+                !/^[+\-−×xX*÷/]?\s*(?:(?:[0-9۰-۹٠-٩]+(?:[.,٫][0-9۰-۹٠-٩]+)?|[0-9۰-۹٠-٩]+:[0-9۰-۹٠-٩]+)(?:[\s:،,|]+|$))+$/.test(lines[0]);
+            if (hasHeader) {
+                const dataRows = lines.slice(1).map(line => {
+                    const match = line.match(/^([+\-−×xX*÷/]?)\s*(.*)$/);
+                    if (!match) return null;
+                    const values = splitColumns(match[2]);
+                    if (!values.length || values.length > headerLabels.length || values.some(value => value && !isNumber(value)) || !values.some(Boolean)) return null;
+                    const operators = { x: '×', X: '×', '*': '×', '/': '÷', '-': '−' };
+                    return { operator: operators[match[1]] || match[1], values };
+                });
+                if (!dataRows.length || dataRows.some(row => !row)) {
+                    return '<p class="text-xs text-rose-600">هر عنوان دلخواهی را در خط اول بنویسید و در خطوط بعدی برای هر عنوان یک عدد وارد کنید؛ ستون‌ها را با فاصله، ویرگول یا Tab جدا کنید.</p>';
+                }
+                return `<table dir="ltr" class="mx-auto border-collapse font-mono text-sm leading-tight"><thead><tr><th class="w-5"></th>${headerLabels.map(label => `<th class="px-1 text-center text-[10px] font-sans font-medium text-slate-600">${escapeHtml(toPersianMathDigits(label))}</th>`).join('')}</tr></thead><tbody>${dataRows.map((row, rowIndex) => `
+                    <tr>
+                        <td class="w-5 px-0.5 text-center">${escapeHtml(row.operator)}</td>
+                        ${headerLabels.map((_, columnIndex) => `<td class="min-w-8 px-1 text-center ${rowIndex === dataRows.length - 1 ? 'border-b-2 border-slate-700 pb-0.5' : ''}">${row.values[columnIndex] ? escapeHtml(toPersianMathDigits(row.values[columnIndex])) : '&nbsp;'}</td>`).join('')}
+                    </tr>
+                `).join('')}</tbody></table>`;
+            }
+            const parseCompoundValue = value => {
+                const unitPattern = new RegExp(`(${digits})\\s*(روز|ساعت|دقیقه|ثانیه)`, 'g');
+                const matches = [...value.matchAll(unitPattern)];
+                if (matches.length) {
+                    const remainder = value.replace(unitPattern, '').replace(/و/g, '').replace(/[\s،,]/g, '');
+                    if (remainder) return null;
+                    const values = Array(4).fill('');
+                    for (const match of matches) {
+                        const column = unitAliases[match[2]];
+                        if (values[column]) return null;
+                        values[column] = match[1];
+                    }
+                    return { kind: 'compound', values };
+                }
+
+                if (/^[0-9۰-۹٠-٩]+(?::[0-9۰-۹٠-٩]+){1,3}$/.test(value)) {
+                    const parts = value.split(':');
+                    const values = Array(4).fill('');
+                    const startColumn = parts.length === 4 ? 0 : 1;
+                    parts.forEach((part, index) => { values[startColumn + index] = part; });
+                    return { kind: 'compound', values };
+                }
+                if (new RegExp(`^(?:${digits}\\s+)?${digits}\\s*\\/\\s*${digits}$`).test(value) ||
+                    new RegExp(`^${digits}(?:[.,٫]${digits})?$`).test(value)) {
+                    return { kind: 'scalar', value };
+                }
+                return null;
+            };
+            const parsedLines = lines.map(line => {
+                const match = line.match(/^([+\-−×xX*÷/]?)\s*(.*)$/);
+                if (!match) return null;
+                const parsedValue = parseCompoundValue(match[2].trim());
+                if (!parsedValue) return null;
+                const operators = { x: '×', X: '×', '*': '×', '/': '÷', '-': '−' };
+                return { operator: operators[match[1]] || match[1], ...parsedValue };
+            });
+            if (parsedLines.length < 2 || parsedLines.some(line => !line)) {
+                return '<p class="text-xs text-rose-600">عددها را هرکدام در یک خط وارد کنید؛ برای زمان از «۲ ساعت و ۳۵ دقیقه» یا «۲:۳۵» استفاده کنید و عملگر را پیش از عدد بنویسید.</p>';
+            }
+            const hasCompound = parsedLines.some(line => line.kind === 'compound');
+            if (hasCompound && parsedLines.some(line => line.kind !== 'compound')) {
+                return '<p class="text-xs text-rose-600">در یک عملیات، همهٔ خط‌ها را با قالب یکسان وارد کنید؛ عدد ساده را با زمانِ چندبخشی ترکیب نکنید.</p>';
+            }
+            if (hasCompound) {
+                const firstColumn = Math.min(...parsedLines.flatMap(line => line.values.map((value, index) => value ? index : 4)));
+                const columns = unitColumns.slice(firstColumn);
+                return `<table dir="ltr" class="mx-auto border-collapse font-mono text-sm leading-tight"><thead><tr><th class="w-5"></th>${columns.map(unit => `<th class="px-1 text-center text-[10px] font-sans font-medium text-slate-600">${unit}</th>`).join('')}</tr></thead><tbody>${parsedLines.map((line, lineIndex) => `
+                    <tr>
+                        <td class="w-5 px-0.5 text-center">${escapeHtml(line.operator)}</td>
+                        ${line.values.slice(firstColumn).map((value, index) => `<td class="min-w-8 px-1 text-center ${lineIndex === parsedLines.length - 1 ? 'border-b-2 border-slate-700 pb-0.5' : ''}">${value ? escapeHtml(toPersianMathDigits(value)) : '&nbsp;'}</td>`).join('')}
+                    </tr>
+                `).join('')}</tbody></table>`;
+            }
+            const renderNumber = value => {
+                const fraction = value.match(new RegExp(`^(${digits}\\s+)?(${digits})\\s*\\/\\s*(${digits})$`));
+                if (!fraction) return escapeHtml(toPersianMathDigits(value));
+                const whole = (fraction[1] || '').trim();
+                return `<span class="inline-flex items-center gap-0.5">${whole ? `<span>${escapeHtml(toPersianMathDigits(whole))}</span>` : ''}<span class="inline-grid text-center align-middle text-[0.72em] leading-none"><span class="border-b border-slate-700 px-0.5 pb-0.5">${escapeHtml(toPersianMathDigits(fraction[2]))}</span><span class="px-0.5 pt-0.5">${escapeHtml(toPersianMathDigits(fraction[3]))}</span></span></span>`;
+            };
+            return `<table dir="ltr" class="mx-auto border-collapse font-mono text-lg leading-tight"><tbody>${parsedLines.map((line, index) => `
+                <tr>
+                    <td class="w-6 px-0.5 text-center">${escapeHtml(line.operator)}</td>
+                    <td class="min-w-16 px-1 text-right ${index === parsedLines.length - 1 ? 'border-b-2 border-slate-700 pb-0.5' : ''}">${renderNumber(line.value)}</td>
+                </tr>
+            `).join('')}</tbody></table>`;
+        }
+
+        function renderMathComponentContent(component) {
+            const data = component.data;
+            if (component.type === 'formula') return data.expression.trim() ? renderMathExpression(data.expression) : '';
+            if (component.type === 'numberLine') return renderNumberLine(data);
+            if (component.type === 'geometry') return renderGeometry(data);
+            if (component.type === 'arithmetic') return renderVerticalArithmetic(data);
+            if (component.type === 'dataTable') return renderDataTable(data.content);
+            if (component.type === 'chart') return renderBarChart(data.content);
+            return '';
+        }
+
+        function renderMathCanvas(questionIndex, math) {
+            const components = math.components.filter(component => component.type !== 'formula' || component.data.expression.trim());
+            const minHeight = Math.max(12, ...components.map(component => component.y + mathComponentEstimatedHeight(component)));
+            return `
+                <div class="math-items-canvas relative w-full overflow-visible mt-2" data-question-index="${questionIndex}" style="height:${minHeight}mm; min-height:12mm;">
+                    ${components.map(component => `
+                        <div class="math-positioned-item absolute" data-math-item-id="${escapeHtml(component.id)}"
+                            onpointerdown="startMathItemDrag(event, ${questionIndex}, '${component.id}')"
+                            style="left:${component.x}%;top:${component.y}mm;width:${component.width}%;cursor:move;">
+                            <span class="math-position-handle no-print" aria-hidden="true">برای جابه‌جایی بکشید</span>
+                            ${renderMathComponentContent(component)}
+                        </div>
+                    `).join('')}
+                </div>`;
+        }
+
+        function updateMathCanvasHeight(canvas) {
+            if (!canvas) return;
+            const bottom = Array.from(canvas.querySelectorAll('.math-positioned-item')).reduce((max, item) => Math.max(max, item.offsetTop + item.offsetHeight), 0);
+            const minimum = 12 * 96 / 25.4;
+            canvas.style.height = `${Math.max(minimum, bottom + 12)}px`;
+        }
+
+        function updateMathCanvasHeights(root) {
+            root.querySelectorAll('.math-items-canvas').forEach(updateMathCanvasHeight);
+        }
+
+        let activeMathItemDrag = null;
+
+        function startMathItemDrag(event, questionIndex, componentId) {
+            if (event.button !== 0 || window.matchMedia('print').matches) return;
+            const question = appState.questions[questionIndex];
+            const canvas = event.currentTarget.closest('.math-items-canvas');
+            const canvasWidth = canvas?.clientWidth;
+            if (!question || !canvas || !canvasWidth) return;
+            ensureMathTools(question);
+            const component = question.math.components.find(item => item.id === componentId);
+            if (!component) return;
+
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            activeMathItemDrag = {
+                questionIndex, componentId, pointerId: event.pointerId,
+                startX: event.clientX, startY: event.clientY,
+                startLeft: component.x, startTop: component.y,
+                canvasWidth, element: event.currentTarget, canvas
+            };
+            document.addEventListener('pointermove', moveMathItemDrag);
+            document.addEventListener('pointerup', endMathItemDrag);
+            document.addEventListener('pointercancel', endMathItemDrag);
+        }
+
+        function moveMathItemDrag(event) {
+            const drag = activeMathItemDrag;
+            if (!drag || event.pointerId !== drag.pointerId) return;
+            const question = appState.questions[drag.questionIndex];
+            const component = question?.math?.components?.find(item => item.id === drag.componentId);
+            if (!component) return;
+            component.x = Math.min(100 - component.width, Math.max(0, drag.startLeft + (event.clientX - drag.startX) / drag.canvasWidth * 100));
+            component.y = Math.min(1000, Math.max(0, drag.startTop + (event.clientY - drag.startY) * 25.4 / 96));
+            drag.element.style.left = `${component.x}%`;
+            drag.element.style.top = `${component.y}mm`;
+            ['x', 'y'].forEach(field => {
+                const input = document.getElementById(`math-position-${drag.questionIndex}-${component.id}-${field}`);
+                if (input) input.value = component[field].toFixed(1);
+            });
+            updateMathCanvasHeight(drag.canvas);
+        }
+
+        function endMathItemDrag(event) {
+            const drag = activeMathItemDrag;
+            if (!drag || event.pointerId !== drag.pointerId) return;
+            activeMathItemDrag = null;
+            document.removeEventListener('pointermove', moveMathItemDrag);
+            document.removeEventListener('pointerup', endMathItemDrag);
+            document.removeEventListener('pointercancel', endMathItemDrag);
+            saveToStorage();
+            renderPaper();
+        }
+
+        function renderDataTable(content) {
+            const rows = String(content || '').split(/\r?\n/).filter(Boolean).slice(0, 12).map(row => row.split('\t').slice(0, 8));
+            if (!rows.length) return '';
+            return `<table class="w-full border-collapse text-xs mt-2"><tbody>${rows.map((row, rowIndex) => `<tr>${row.map(cell => `<${rowIndex === 0 ? 'th' : 'td'} class="border border-slate-500 px-2 py-1 text-center ${rowIndex === 0 ? 'bg-slate-100 font-bold' : ''}">${escapeHtml(toPersianMathDigits(cell))}</${rowIndex === 0 ? 'th' : 'td'}>`).join('')}</tr>`).join('')}</tbody></table>`;
+        }
+
+        function renderBarChart(content) {
+            const entries = String(content || '').split(/\r?\n/).filter(Boolean).slice(0, 10).map(line => {
+                const parts = line.split(/[,:،]/);
+                return { label: (parts.shift() || '').trim(), value: normalizeMathNumber(parts.join('').trim()) };
+            }).filter(item => item.label && item.value !== null && item.value >= 0);
+            if (!entries.length) return '<p class="text-xs text-rose-600">داده‌های نمودار را به‌صورت «برچسب، مقدار» در هر خط وارد کنید.</p>';
+            const max = Math.max(...entries.map(item => item.value), 1);
+            const barWidth = 540 / entries.length;
+            const bars = entries.map((item, index) => {
+                const height = (item.value / max) * 145;
+                const x = 50 + index * barWidth + barWidth * 0.2;
+                const width = barWidth * 0.6;
+                return `<rect x="${x}" y="${190 - height}" width="${width}" height="${height}" fill="#38bdf8" stroke="#0369a1"/><text x="${x + width / 2}" y="${185 - height}" text-anchor="middle" font-size="11">${escapeHtml(formatMathNumber(item.value))}</text><text x="${x + width / 2}" y="215" text-anchor="middle" font-size="11">${escapeHtml(toPersianMathDigits(item.label))}</text>`;
+            }).join('');
+            return `<svg viewBox="0 0 640 240" role="img" aria-label="نمودار ستونی" class="w-full max-w-2xl mx-auto"><line x1="45" y1="190" x2="600" y2="190" stroke="#334155" stroke-width="2"/>${bars}</svg>`;
+        }
+
+        function readImageFile(file) {
+            return new Promise((resolve, reject) => {
+                if (!file.type.startsWith('image/')) {
+                    reject(new Error(`«${file.name}» فایل تصویر نیست.`));
+                    return;
+                }
+
+                if (file.size > 12 * 1024 * 1024) {
+                    reject(new Error(`حجم «${file.name}» بیشتر از ۱۲ مگابایت است.`));
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = () => resolve(createQuestionImage(reader.result));
+                reader.onerror = () => reject(new Error(`خواندن فایل «${file.name}» ناموفق بود.`));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // افزودن یک یا چند تصویر به سوال
+        async function handleImageUpload(index, event) {
+            const files = Array.from(event.target.files || []);
+            event.target.value = '';
+            if (!files.length) return;
+
+            try {
+                const images = await Promise.all(files.map(readImageFile));
+                const question = appState.questions[index];
+                question.images.push(...images);
+                if (!saveToStorage()) {
+                    question.images.splice(-images.length, images.length);
+                    showToast('فضای ذخیره‌سازی مرورگر کافی نیست؛ تصویرها را کوچک‌تر کنید یا چند تصویر را حذف کنید.');
+                    renderQuestionsEditor();
+                    renderPaper();
+                    return;
+                }
+                renderQuestionsEditor();
+                renderPaper();
+                showToast(`${toPersianDigits(images.length)} تصویر به سوال اضافه شد.`);
+            } catch (error) {
+                console.error('خطا در افزودن تصویر سوال:', error);
+                showToast(error.message || 'افزودن تصویر ناموفق بود.');
+            }
+        }
+
+        function updateQuestionImage(index, imageIndex, field, value, persist = false) {
+            const image = appState.questions[index]?.images?.[imageIndex];
+            if (!image) return;
+
+            const numericRanges = {
+                width: [10, 100],
+                height: [0, 160],
+                cropX: [0, 100],
+                cropY: [0, 100]
+            };
+            if (field === 'align' && ['right', 'center', 'left'].includes(value)) {
+                image.align = value;
+            } else if (numericRanges[field]) {
+                const numericValue = Number(value);
+                if (!Number.isFinite(numericValue)) return;
+                const [min, max] = numericRanges[field];
+                image[field] = Math.min(max, Math.max(min, numericValue));
+            } else {
+                return;
+            }
+
+            const valueLabels = {
+                width: `${toPersianDigits(image.width)}٪`,
+                height: `${toPersianDigits(image.height)} میلی‌متر`,
+                cropX: `${toPersianDigits(image.cropX)}٪`,
+                cropY: `${toPersianDigits(image.cropY)}٪`
+            };
+            const valueLabel = document.getElementById(`image-${field.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}-val-${index}-${imageIndex}`);
+            if (valueLabel && valueLabels[field]) valueLabel.textContent = valueLabels[field];
+
+            if (persist) saveToStorage();
+            renderPaper();
+        }
+
+        function moveQuestionImage(index, imageIndex, direction) {
+            const images = appState.questions[index]?.images;
+            const nextIndex = imageIndex + direction;
+            if (!images || nextIndex < 0 || nextIndex >= images.length) return;
+
+            [images[imageIndex], images[nextIndex]] = [images[nextIndex], images[imageIndex]];
+            saveToStorage();
+            renderQuestionsEditor();
+            renderPaper();
+        }
+
+        function removeQuestionImage(index, imageIndex) {
+            const question = appState.questions[index];
+            if (!question?.images?.[imageIndex]) return;
+
+            question.images.splice(imageIndex, 1);
             saveToStorage();
             renderQuestionsEditor();
             renderPaper();
@@ -794,7 +1715,9 @@
                 descriptive: { label: 'تشریحی', color: 'bg-blue-100 text-blue-700' },
                 mcq: { label: 'چهارگزینه‌ای', color: 'bg-emerald-100 text-emerald-700' },
                 blank: { label: 'جای خالی', color: 'bg-amber-100 text-amber-700' },
-                tf: { label: 'صحیح / غلط', color: 'bg-purple-100 text-purple-700' }
+                tf: { label: 'صحیح / غلط', color: 'bg-purple-100 text-purple-700' },
+                matching: { label: 'وصل‌کردنی', color: 'bg-indigo-100 text-indigo-700' },
+                math: { label: 'ریاضی', color: 'bg-cyan-100 text-cyan-700' }
             };
 
             appState.questions.forEach((q, idx) => {
@@ -817,6 +1740,125 @@
                         </div>
                     `;
                 }
+
+                let matchingEditorHtml = '';
+                if (q.type === 'matching') {
+                    q.matching ||= { leftItems: [''], rightItems: [''] };
+                    const renderMatchingColumn = (column, title) => `
+                        <div class="space-y-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                            <div class="text-xs font-semibold text-slate-700">${title}</div>
+                            ${q.matching[column].map((item, itemIndex) => `
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs font-bold text-slate-400 w-5 shrink-0">${toPersianDigits(itemIndex + 1)}.</span>
+                                    <input type="text" value="${escapeHtml(item)}"
+                                        oninput="updateMatchingItem(${idx}, '${column}', ${itemIndex}, this.value)"
+                                        placeholder="متن ${title} ${toPersianDigits(itemIndex + 1)}"
+                                        class="w-full min-w-0 px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:border-blue-500 outline-none">
+                                    <button type="button" onclick="removeMatchingItem(${idx}, '${column}', ${itemIndex})" ${q.matching[column].length <= 1 ? 'disabled' : ''} title="حذف مورد" class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 disabled:opacity-30">
+                                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
+                            `).join('')}
+                            <button type="button" onclick="addMatchingItem(${idx}, '${column}')" class="w-full flex items-center justify-center gap-1 text-[11px] text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-100 px-2 py-1.5 rounded-lg">
+                                <i data-lucide="plus" class="w-3 h-3"></i>
+                                افزودن مورد
+                            </button>
+                        </div>
+                    `;
+                    matchingEditorHtml = `
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            ${renderMatchingColumn('leftItems', 'ستون الف')}
+                            ${renderMatchingColumn('rightItems', 'ستون ب')}
+                        </div>
+                    `;
+                }
+
+                let mathEditorHtml = '';
+                if (q.type === 'math') {
+                    ensureMathTools(q);
+                    const math = q.math;
+                    mathEditorHtml = `
+                        <details open class="bg-cyan-50/60 border border-cyan-200 rounded-xl p-3 space-y-3">
+                            <summary class="cursor-pointer text-xs font-bold text-cyan-900">اجزای ریاضی و جای‌گذاری دقیق</summary>
+                            <div class="space-y-2 pt-2">
+                                <div class="grid grid-cols-[1fr_auto] gap-2">
+                                    <select id="math-component-type-${idx}" class="min-w-0 px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white">
+                                        ${Object.entries(mathComponentTypes).map(([type, label]) => `<option value="${type}">${label}</option>`).join('')}
+                                    </select>
+                                    <button type="button" onclick="addMathComponent(${idx}, document.getElementById('math-component-type-${idx}').value)" class="px-3 py-1.5 text-xs text-cyan-900 bg-white border border-cyan-200 rounded-md hover:bg-cyan-100">افزودن جزء</button>
+                                </div>
+                                <p class="text-[10px] leading-relaxed text-slate-500">هر جزء را چندبار اضافه کنید. موقعیت افقی (درصد) و عمودی (میلی‌متر) را دقیق وارد کنید یا همان جزء را روی پیش‌نمایش بکشید.</p>
+                                <div class="space-y-2">
+                                    ${math.components.length
+                                        ? math.components.map(component => renderMathComponentEditor(idx, component)).join('')
+                                        : '<p class="rounded-lg border border-dashed border-cyan-200 bg-white/60 p-3 text-center text-[11px] text-slate-500">هنوز جزئی اضافه نشده است.</p>'}
+                                </div>
+                                <label class="block border-t border-cyan-100 pt-2 text-xs font-semibold text-slate-700">قالب پاسخ دانش‌آموز
+                                    <select onchange="updateMathField(${idx}, 'answerType', this.value)" class="mt-1 w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white">
+                                        <option value="steps" ${math.answerType === 'steps' ? 'selected' : ''}>فضای حل مرحله‌به‌مرحله</option>
+                                        <option value="numeric" ${math.answerType === 'numeric' ? 'selected' : ''}>پاسخ عددی کوتاه</option>
+                                        <option value="fill" ${math.answerType === 'fill' ? 'selected' : ''}>جای خالی</option>
+                                        <option value="draw" ${math.answerType === 'draw' ? 'selected' : ''}>فضای رسم و ترسیم</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </details>
+                    `;
+                }
+
+                normalizeQuestionImages(q);
+                const imagesEditorHtml = `
+                    <div class="space-y-2 pt-2 border-t border-slate-100">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-semibold text-slate-700">تصاویر سوال (${toPersianDigits(q.images.length)})</span>
+                            <label class="flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl font-medium cursor-pointer transition">
+                                <i data-lucide="image-plus" class="w-3.5 h-3.5 text-blue-600"></i>
+                                <span>افزودن تصویر</span>
+                                <input type="file" accept="image/*" multiple onchange="handleImageUpload(${idx}, event)" class="hidden">
+                            </label>
+                        </div>
+                        ${q.images.length ? q.images.map((image, imageIndex) => `
+                            <div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <img src="${escapeHtml(image.src)}" alt="پیش‌نمایش تصویر ${toPersianDigits(imageIndex + 1)}" class="w-20 h-14 object-cover rounded-lg border border-slate-200 shrink-0" style="object-position: ${image.cropX}% ${image.cropY}%;">
+                                    <div class="flex-1 text-[11px] text-slate-600">تصویر ${toPersianDigits(imageIndex + 1)}<br><span class="text-[10px] text-slate-400">برای تغییر ترتیب، از دکمه‌های پیکان استفاده کنید.</span></div>
+                                    <div class="flex items-center gap-1">
+                                        <button type="button" onclick="moveQuestionImage(${idx}, ${imageIndex}, -1)" ${imageIndex === 0 ? 'disabled' : ''} title="انتقال تصویر به بالا" class="p-1.5 rounded-lg text-slate-500 hover:bg-white disabled:opacity-30"><i data-lucide="arrow-up" class="w-3.5 h-3.5"></i></button>
+                                        <button type="button" onclick="moveQuestionImage(${idx}, ${imageIndex}, 1)" ${imageIndex === q.images.length - 1 ? 'disabled' : ''} title="انتقال تصویر به پایین" class="p-1.5 rounded-lg text-slate-500 hover:bg-white disabled:opacity-30"><i data-lucide="arrow-down" class="w-3.5 h-3.5"></i></button>
+                                        <button type="button" onclick="removeQuestionImage(${idx}, ${imageIndex})" title="حذف تصویر" class="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                    </div>
+                                </div>
+                                <label class="block text-[11px] text-slate-600">
+                                    عرض تصویر: <span id="image-width-val-${idx}-${imageIndex}">${toPersianDigits(image.width)}٪</span>
+                                    <input type="range" min="10" max="100" step="5" value="${image.width}" oninput="updateQuestionImage(${idx}, ${imageIndex}, 'width', this.value)" onchange="updateQuestionImage(${idx}, ${imageIndex}, 'width', this.value, true)" class="w-full accent-blue-600">
+                                </label>
+                                <label class="block text-[11px] text-slate-600">
+                                    ارتفاع قاب برش (صفر = اندازه اصلی): <span id="image-height-val-${idx}-${imageIndex}">${toPersianDigits(image.height)} میلی‌متر</span>
+                                    <input type="range" min="0" max="160" step="5" value="${image.height}" oninput="updateQuestionImage(${idx}, ${imageIndex}, 'height', this.value)" onchange="updateQuestionImage(${idx}, ${imageIndex}, 'height', this.value, true)" class="w-full accent-blue-600">
+                                </label>
+                                <p class="text-[10px] text-slate-400">برای برش تصویر، ارتفاع قاب را بیشتر از صفر تنظیم کنید.</p>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <label class="block text-[11px] text-slate-600">
+                                        برش افقی: <span id="image-crop-x-val-${idx}-${imageIndex}">${toPersianDigits(image.cropX)}٪</span>
+                                        <input type="range" min="0" max="100" step="1" value="${image.cropX}" oninput="updateQuestionImage(${idx}, ${imageIndex}, 'cropX', this.value)" onchange="updateQuestionImage(${idx}, ${imageIndex}, 'cropX', this.value, true)" class="w-full accent-blue-600">
+                                    </label>
+                                    <label class="block text-[11px] text-slate-600">
+                                        برش عمودی: <span id="image-crop-y-val-${idx}-${imageIndex}">${toPersianDigits(image.cropY)}٪</span>
+                                        <input type="range" min="0" max="100" step="1" value="${image.cropY}" oninput="updateQuestionImage(${idx}, ${imageIndex}, 'cropY', this.value)" onchange="updateQuestionImage(${idx}, ${imageIndex}, 'cropY', this.value, true)" class="w-full accent-blue-600">
+                                    </label>
+                                </div>
+                                <label class="block text-[11px] text-slate-600">
+                                    جای تصویر زیر سوال
+                                    <select onchange="updateQuestionImage(${idx}, ${imageIndex}, 'align', this.value, true)" class="mt-1 w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg">
+                                        <option value="right" ${image.align === 'right' ? 'selected' : ''}>راست</option>
+                                        <option value="center" ${image.align === 'center' ? 'selected' : ''}>وسط</option>
+                                        <option value="left" ${image.align === 'left' ? 'selected' : ''}>چپ</option>
+                                    </select>
+                                </label>
+                            </div>
+                        `).join('') : '<p class="text-[11px] text-slate-400">هنوز تصویری برای این سوال انتخاب نشده است.</p>'}
+                    </div>
+                `;
 
                 card.innerHTML = `
                     <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
@@ -844,6 +1886,8 @@
                     </div>
 
                     ${optionsHtml}
+                    ${matchingEditorHtml}
+                    ${mathEditorHtml}
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100 items-center">
                         <div class="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
@@ -854,21 +1898,8 @@
                                 class="w-full text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 text-slate-700 outline-none focus:border-blue-500">
                         </div>
 
-                        <div class="flex items-center justify-end gap-2">
-                            ${q.image ? `
-                                <button onclick="removeQuestionImage(${idx})" class="flex items-center gap-1 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 rounded-xl font-medium transition">
-                                    <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
-                                    <span>حذف تصویر</span>
-                                </button>
-                            ` : `
-                                <label class="flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl font-medium cursor-pointer transition">
-                                    <i data-lucide="image-plus" class="w-3.5 h-3.5 text-blue-600"></i>
-                                    <span>افزودن تصویر</span>
-                                    <input type="file" accept="image/*" onchange="handleImageUpload(${idx}, event)" class="hidden">
-                                </label>
-                            `}
-                        </div>
                     </div>
+                    ${imagesEditorHtml}
 
                     <div class="bg-blue-50/50 px-3 py-2 rounded-xl border border-blue-100">
                         <div class="flex justify-between items-center text-[11px] font-medium text-slate-600 mb-1">
@@ -1011,31 +2042,33 @@
         function renderPaper() {
             const paper = document.getElementById('exam-paper');
             const { meta, settings, questions, descriptive } = appState;
+            paper.classList.toggle('page-border-enabled', !!settings.pageBorder);
+            paper.dataset.pageBorderStyle = settings.pageBorderStyle || 'solid';
+            paper.style.setProperty('--page-border-inset', `${settings.pageBorderInset ?? 5}mm`);
+            paper.style.setProperty('--page-border-width', `${settings.pageBorderWidth ?? 1}mm`);
 
-            // ساخت سربرگ رسمی برگه امتحان با چیدمان ایمن و بدون تداخل متون
+            // ساخت سربرگ رسمی برگه امتحان
             const headerHtml = `
-                <div class="exam-header-block mb-5">
+                <div class="mb-5">
                     <div class="text-center text-xs font-bold text-slate-700 mb-2">${escapeHtml(meta.bismillah)}</div>
                     <div class="border-2 border-slate-800 rounded-xl overflow-hidden">
-                        <div class="bg-slate-100 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between gap-2">
+                        <div class="bg-slate-100 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between">
                             <div class="text-xs font-bold text-slate-700">${escapeHtml(meta.school)}</div>
-                            <div class="text-sm font-extrabold text-slate-900 text-center">${escapeHtml(meta.title)}</div>
+                            <div class="text-sm font-extrabold text-slate-900">${escapeHtml(meta.title)}</div>
                             <div class="text-xs font-bold text-slate-700">درس: ${escapeHtml(meta.subject)}</div>
                         </div>
-                        <div class="p-3 grid grid-cols-12 gap-y-2.5 gap-x-3 text-xs bg-white leading-normal">
-                            <div class="col-span-6 flex items-center gap-1.5">
-                                <span class="font-semibold text-slate-700 shrink-0">نام و نام خانوادگی:</span>
-                                <span class="border-b border-dotted border-slate-500 flex-1 h-4"></span>
+                        <div class="p-3 grid grid-cols-12 gap-y-2.5 gap-x-3 text-xs bg-white">
+                            <div class="col-span-5 flex items-center gap-1">
+                                <span class="font-semibold text-slate-700 whitespace-nowrap">نام و نام خانوادگی:</span>
+                                <span class="border-b border-dotted border-slate-500 flex-1 h-4" style="margin-inline-end: 2em;"></span>
                             </div>
-                            <div class="col-span-6 flex items-center justify-between gap-2">
-                                <div>
-                                    <span class="font-semibold text-slate-700">پایه/کلاس:</span>
-                                    <span class="text-slate-900">${escapeHtml(meta.grade)}</span>
-                                </div>
-                                <div>
-                                    <span class="font-semibold text-slate-700">تاریخ:</span>
-                                    <span class="text-slate-900">${escapeHtml(meta.date)}</span>
-                                </div>
+                            <div class="col-span-4 whitespace-nowrap">
+                                <span class="font-semibold text-slate-700">پایه/کلاس:</span>
+                                <span class="text-slate-900">${escapeHtml(meta.grade)}</span>
+                            </div>
+                            <div class="col-span-3">
+                                <span class="font-semibold text-slate-700">تاریخ:</span>
+                                <span class="text-slate-900">${escapeHtml(meta.date)}</span>
                             </div>
 
                             <div class="col-span-5">
@@ -1046,18 +2079,18 @@
                                 <span class="font-semibold text-slate-700">مدت پاسخ‌گویی:</span>
                                 <span class="text-slate-900">${escapeHtml(meta.duration)}</span>
                             </div>
-                            <div class="col-span-3 text-left">
+                            <div class="col-span-3">
                                 <span class="font-semibold text-slate-700">نوع ارزشیابی:</span>
                                 <span class="text-slate-900 font-bold">توصیفی</span>
                             </div>
 
                             ${meta.showSeatNumber ? `
-                                <div class="col-span-6 flex items-center gap-1.5 pt-0.5">
-                                    <span class="font-semibold text-slate-700 shrink-0">نام پدر:</span>
+                                <div class="col-span-6 flex items-center gap-1 pt-0.5">
+                                    <span class="font-semibold text-slate-700 whitespace-nowrap">نام پدر:</span>
                                     <span class="border-b border-dotted border-slate-500 flex-1 h-4"></span>
                                 </div>
-                                <div class="col-span-6 flex items-center gap-1.5 pt-0.5">
-                                    <span class="font-semibold text-slate-700 shrink-0">شماره صندلی / کد دانش‌آموزی:</span>
+                                <div class="col-span-6 flex items-center gap-1 pt-0.5">
+                                    <span class="font-semibold text-slate-700 whitespace-nowrap">شماره صندلی / کد دانش‌آموزی:</span>
                                     <span class="border-b border-dotted border-slate-500 flex-1 h-4"></span>
                                 </div>
                             ` : ''}
@@ -1067,41 +2100,102 @@
             `;
 
             // ساخت لیست سوالات
-            let questionsHtml = `<div class="questions-wrapper" style="font-size: ${settings.fontSize}px;">`;
+            let questionsHtml = `<div style="font-size: ${settings.fontSize}px;">`;
 
             questions.forEach((q, idx) => {
                 const formattedText = escapeHtml(q.text).replace(/\n/g, '<br>');
                 const marginBottom = settings.globalSpacing;
 
+                let questionTextHtml = `<div class="font-medium text-slate-900">${formattedText}</div>`;
                 let typeSpecificBody = '';
                 if (q.type === 'mcq') {
                     typeSpecificBody = `
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2.5 pr-4">
+                        <div class="flex flex-wrap items-start gap-x-6 gap-y-2 mt-2.5 pr-4">
                             ${q.options.map((opt, oIdx) => `
-                                <div class="flex items-center gap-1.5">
+                                <div dir="rtl" class="flex items-start gap-1.5 min-w-0 max-w-full">
                                     <span class="w-4 h-4 rounded-full border border-slate-600 inline-flex items-center justify-center text-[10px] font-bold shrink-0">${toPersianDigits(oIdx + 1)}</span>
-                                    <span>${escapeHtml(opt)}</span>
+                                    <span dir="auto" class="min-w-0 [overflow-wrap:anywhere]">${escapeHtml(opt)}</span>
+                                    <span aria-hidden="true" class="w-3.5 h-3.5 border border-slate-600 rounded-sm shrink-0 mt-0.5"></span>
                                 </div>
                             `).join('')}
                         </div>
                     `;
                 } else if (q.type === 'tf') {
-                    typeSpecificBody = `
-                        <div class="mt-2 pr-4 flex flex-wrap items-center gap-6 text-xs text-slate-700">
-                            <span>الف) صحیح <span class="inline-block w-3.5 h-3.5 border border-slate-600 align-middle mr-1"></span> &nbsp;&nbsp; غلط <span class="inline-block w-3.5 h-3.5 border border-slate-600 align-middle mr-1"></span></span>
-                            <span>ب) صحیح <span class="inline-block w-3.5 h-3.5 border border-slate-600 align-middle mr-1"></span> &nbsp;&nbsp; غلط <span class="inline-block w-3.5 h-3.5 border border-slate-600 align-middle mr-1"></span></span>
+                    const lines = q.text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+                    const statementPattern = /^(?:[الف-ی]|[0-9۰-۹]+)[)）.،-]\s*/;
+                    const firstStatementIndex = lines.findIndex(line => statementPattern.test(line));
+                    const hasInstruction = /درستی|نادرستی|صحیح|غلط/.test(lines[0] || '');
+                    const instructionLines = firstStatementIndex >= 0
+                        ? lines.slice(0, firstStatementIndex)
+                        : hasInstruction && lines.length > 1 ? lines.slice(0, 1) : [];
+                    const statementLines = firstStatementIndex >= 0
+                        ? lines.slice(firstStatementIndex)
+                        : hasInstruction && lines.length > 1 ? lines.slice(1) : lines;
+
+                    questionTextHtml = `
+                        ${instructionLines.length ? `<div class="font-medium text-slate-900 mb-1">${instructionLines.map(escapeHtml).join('<br>')}</div>` : ''}
+                        <table class="w-full mt-1 text-xs text-slate-700 border-collapse">
+                            <tbody>
+                                ${statementLines.map(line => `
+                                    <tr>
+                                        <td class="py-1 pl-3 align-middle">${escapeHtml(line)}</td>
+                                        <td class="py-1 text-left align-middle whitespace-nowrap">
+                                            <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 border border-slate-600 inline-block"></span> صحیح</span>
+                                            <span class="inline-flex items-center gap-1 mr-3"><span class="w-3.5 h-3.5 border border-slate-600 inline-block"></span> غلط</span>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else if (q.type === 'matching') {
+                    q.matching ||= { leftItems: [''], rightItems: [''] };
+                    const renderMatchingPaperColumn = (items, title) => `
+                        <div class="col-span-5 space-y-2">
+                            <div class="font-bold text-center border-b border-slate-400 pb-1">${title}</div>
+                            ${items.map((item, itemIndex) => `
+                                <div class="flex items-start gap-1.5 min-h-7">
+                                    <span class="font-bold shrink-0">${toPersianDigits(itemIndex + 1)}.</span>
+                                    <span class="flex-1 min-w-0">${item ? escapeHtml(item) : '<span class="inline-block w-full border-b border-dotted border-slate-400 h-5"></span>'}</span>
+                                </div>
+                            `).join('')}
                         </div>
                     `;
+                    questionTextHtml = `<div class="font-medium text-slate-900">${formattedText}</div>`;
+                    typeSpecificBody = `
+                        <div dir="rtl" class="grid grid-cols-12 gap-2 mt-3 text-xs leading-relaxed">
+                            ${renderMatchingPaperColumn(q.matching.leftItems, 'ستون الف')}
+                            <div class="col-span-2 min-h-12" aria-hidden="true"></div>
+                            ${renderMatchingPaperColumn(q.matching.rightItems, 'ستون ب')}
+                        </div>
+                    `;
+                } else if (q.type === 'math') {
+                    ensureMathTools(q);
+                    const math = q.math;
+                    typeSpecificBody = renderMathCanvas(idx, math);
                 }
 
-                const imageHtml = q.image ? `
-                    <div class="my-2.5 pr-4">
-                        <img src="${q.image}" alt="تصویر سوال" class="max-h-44 rounded-lg border border-slate-200 object-contain">
+                const imageHtml = (q.images || []).map(image => `
+                    <div class="my-2.5 pr-4 flex" style="justify-content: ${image.align || 'center'};">
+                        <img src="${escapeHtml(image.src)}" alt="تصویر سوال" class="rounded-lg border border-slate-200" style="display: block; width: ${image.width}%; max-width: 100%; ${image.height > 0 ? `height: ${image.height}mm; object-fit: cover;` : 'height: auto; object-fit: contain;'} object-position: ${image.cropX}% ${image.cropY}%;">
                     </div>
-                ` : '';
+                `).join('');
 
                 let answerSpaceHtml = '';
-                if (q.extraSpace > 0) {
+                if (q.type === 'math') {
+                    ensureMathTools(q);
+                    if (q.math.answerType === 'numeric') {
+                        answerSpaceHtml = `<div class="mt-3 flex items-center gap-2 text-sm"><span class="font-semibold">پاسخ عددی:</span><span class="inline-block flex-1 border-b border-dotted border-slate-500 h-6"></span></div>`;
+                    } else if (q.math.answerType === 'fill') {
+                        answerSpaceHtml = `<div class="mt-3 space-y-3"><div class="border-b border-dotted border-slate-400 h-5"></div><div class="border-b border-dotted border-slate-400 h-5"></div></div>`;
+                    } else if (q.math.answerType === 'draw') {
+                        answerSpaceHtml = `<div class="mt-3 rounded-lg border border-slate-300" style="height: ${Math.max(60, q.extraSpace)}px; background-image: linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px); background-size: 20px 20px;"></div>`;
+                    } else if (q.extraSpace > 0 && settings.lineStyle === 'lined' && q.extraSpace >= 28) {
+                        answerSpaceHtml = `<div class="answer-lines mt-2" style="height: ${q.extraSpace}px;"></div>`;
+                    } else if (q.extraSpace > 0) {
+                        answerSpaceHtml = `<div style="height: ${q.extraSpace}px;"></div>`;
+                    }
+                } else if (q.extraSpace > 0) {
                     if (settings.lineStyle === 'lined' && q.extraSpace >= 28) {
                         answerSpaceHtml = `<div class="answer-lines mt-2" style="height: ${q.extraSpace}px;"></div>`;
                     } else {
@@ -1110,13 +2204,13 @@
                 }
 
                 questionsHtml += `
-                    <div class="question-block border-b border-slate-200/80 pb-2" style="margin-bottom: ${marginBottom}px;">
+                    <div class="question-block border-b border-slate-200/80 pb-2" data-question-index="${idx}" style="margin-bottom: ${marginBottom}px;">
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex items-start gap-2 flex-1 leading-relaxed">
-                                <span class="font-extrabold text-slate-900 shrink-0">${toPersianDigits(idx + 1)}-</span>
+                                <span dir="rtl" class="inline-flex shrink-0 font-extrabold text-slate-900" style="unicode-bidi: isolate;"><span>${toPersianDigits(idx + 1)}</span><span>-</span></span>
                                 <div class="flex-1">
                                     ${q.skill ? `<span class="inline-block text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-300 rounded px-1.5 py-0.5 mb-1">هدف: ${escapeHtml(q.skill)}</span>` : ''}
-                                    <div class="font-medium text-slate-900">${formattedText}</div>
+                                    ${questionTextHtml}
                                     ${imageHtml}
                                     ${typeSpecificBody}
                                 </div>
@@ -1141,17 +2235,17 @@
             let descriptiveHtml = '';
             if (descriptive.enabled) {
                 const checkMark = `<span class="font-extrabold text-slate-900 text-sm">✓</span>`;
-                const emptyBox = `<span class="inline-block w-3.5 h-3.5 border border-slate-500 rounded-sm align-middle"></span>`;
+                const emptyBox = `<span class="inline-block w-3.5 h-3.5 border border-slate-400 rounded-sm"></span>`;
 
                 descriptiveHtml = `
-                    <div class="descriptive-section mt-5 pt-3 border-t-2 border-slate-800">
+                    <div class="descriptive-section mt-6 pt-3 border-t-2 border-slate-800">
                         <div class="bg-slate-100 border border-slate-800 border-b-0 rounded-t-xl px-3 py-2 text-center font-bold text-xs text-slate-900">
                             ${escapeHtml(descriptive.title)}
                         </div>
-                        <table class="w-full table-fixed border-collapse border border-slate-800 text-[11px]">
+                        <table class="w-full border-collapse border border-slate-800 text-xs">
                             <thead>
                                 <tr class="bg-slate-50 text-slate-800 font-bold">
-                                    <th class="border border-slate-800 p-1.5 w-10 text-center">ردیف</th>
+                                    <th class="border border-slate-800 p-1.5 w-9 text-center">ردیف</th>
                                     <th class="border border-slate-800 p-1.5 text-right">مبحث و انتظارات آموزشی مورد ارزیابی</th>
                                     <th class="border border-slate-800 p-1.5 w-16 text-center">خیلی خوب</th>
                                     <th class="border border-slate-800 p-1.5 w-14 text-center">خوب</th>
@@ -1164,12 +2258,12 @@
                                 ${descriptive.rows.map((r, rIdx) => `
                                     <tr>
                                         <td class="border border-slate-800 p-1.5 text-center font-bold">${toPersianDigits(rIdx + 1)}</td>
-                                        <td class="border border-slate-800 p-1.5 leading-relaxed break-words">${escapeHtml(r.objective)}</td>
+                                        <td class="border border-slate-800 p-1.5 leading-relaxed">${escapeHtml(r.objective)}</td>
                                         <td class="border border-slate-800 p-1.5 text-center">${r.level === 'very_good' ? checkMark : emptyBox}</td>
                                         <td class="border border-slate-800 p-1.5 text-center">${r.level === 'good' ? checkMark : emptyBox}</td>
                                         <td class="border border-slate-800 p-1.5 text-center">${r.level === 'acceptable' ? checkMark : emptyBox}</td>
                                         <td class="border border-slate-800 p-1.5 text-center">${r.level === 'needs_effort' ? checkMark : emptyBox}</td>
-                                        <td class="border border-slate-800 p-1.5 text-[10px] text-slate-700 break-words">${escapeHtml(r.comment)}</td>
+                                        <td class="border border-slate-800 p-1.5 text-[11px] text-slate-700">${escapeHtml(r.comment)}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -1199,144 +2293,13 @@
             }
 
             paper.innerHTML = headerHtml + questionsHtml + descriptiveHtml;
-        }
-
-        // خروجی PDF دقیق با صفحه‌بندی هوشمند A4 و رندر مستقیم روی jsPDF
-        async function downloadPDF() {
-            const sourcePaper = document.getElementById('exam-paper');
-            const btn = document.getElementById('pdf-btn');
-
-            if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
-                showToast('در حال باز کردن پنجره چاپ و ذخیره PDF مرورگر...');
-                window.print();
-                return;
-            }
-
-            const originalContent = btn.innerHTML;
-            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>در حال ساخت PDF...</span>`;
-            btn.disabled = true;
-            if (window.lucide) lucide.createIcons();
-
-            // ایجاد کانتینر استاندارد A4 در مختصات (0,0) پشت صفحه برای اسکرین‌شات بدون نقص
-            const sandbox = document.createElement('div');
-            sandbox.className = 'pdf-render-sandbox';
-            document.body.appendChild(sandbox);
-
-            try {
-                const headerEl = sourcePaper.querySelector('.exam-header-block');
-                const questionEls = Array.from(sourcePaper.querySelectorAll('.question-block'));
-                const descriptiveEl = sourcePaper.querySelector('.descriptive-section');
-
-                const blocks = [];
-                if (headerEl) blocks.push({ el: headerEl.cloneNode(true), isQuestion: false });
-                questionEls.forEach(q => blocks.push({ el: q.cloneNode(true), isQuestion: true }));
-                if (descriptiveEl) blocks.push({ el: descriptiveEl.cloneNode(true), isQuestion: false });
-
-                let pages = [];
-                let currentPage = document.createElement('div');
-                currentPage.className = 'pdf-virtual-page';
-                sandbox.appendChild(currentPage);
-                pages.push(currentPage);
-
-                // ارتفاع مفید داخل صفحه با حاشیه امن پایین
-                const maxPageHeight = 1122 - 85;
-
-                for (let i = 0; i < blocks.length; i++) {
-                    const item = blocks[i];
-                    let wrapper = item.el;
-
-                    if (item.isQuestion) {
-                        const qContainer = document.createElement('div');
-                        qContainer.style.fontSize = appState.settings.fontSize + 'px';
-                        qContainer.appendChild(item.el);
-                        wrapper = qContainer;
-                    }
-
-                    currentPage.appendChild(wrapper);
-
-                    if (currentPage.scrollHeight > maxPageHeight && currentPage.children.length > 1) {
-                        currentPage.removeChild(wrapper);
-
-                        currentPage = document.createElement('div');
-                        currentPage.className = 'pdf-virtual-page';
-                        sandbox.appendChild(currentPage);
-                        pages.push(currentPage);
-
-                        currentPage.appendChild(wrapper);
-                    }
-                }
-
-                // درج شماره صفحه فارسی در انتهای صفحات
-                if (pages.length > 1) {
-                    pages.forEach((p, idx) => {
-                        const footer = document.createElement('div');
-                        footer.style.marginTop = 'auto';
-                        footer.style.paddingTop = '10px';
-                        footer.style.borderTop = '1px solid #e2e8f0';
-                        footer.style.textAlign = 'center';
-                        footer.style.fontSize = '11px';
-                        footer.style.color = '#64748b';
-                        footer.textContent = `صفحه ${toPersianDigits(idx + 1)} از ${toPersianDigits(pages.length)}`;
-                        p.appendChild(footer);
-                    });
-                }
-
-                await document.fonts.ready;
-                await new Promise(resolve => setTimeout(resolve, 300));
-
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF({
-                    orientation: 'portrait',
-                    unit: 'mm',
-                    format: 'a4',
-                    compress: true
-                });
-
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = pdf.internal.pageSize.getHeight();
-
-                // رندر تک‌تک صفحات مجازی به تصویر باکیفیت و درج کامل در فایل PDF
-                for (let pIdx = 0; pIdx < pages.length; pIdx++) {
-                    const pageEl = pages[pIdx];
-                    const canvas = await html2canvas(pageEl, {
-                        scale: 2,
-                        useCORS: true,
-                        backgroundColor: '#ffffff',
-                        width: 794,
-                        height: 1122,
-                        windowWidth: 1200,
-                        scrollX: 0,
-                        scrollY: 0,
-                        logging: false
-                    });
-
-                    const imgData = canvas.toDataURL('image/jpeg', 0.96);
-                    if (pIdx > 0) {
-                        pdf.addPage();
-                    }
-                    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-                }
-
-                const fileName = (appState.meta.title || 'آزمون-توصیفی').replace(/\s+/g, '-') + '.pdf';
-                pdf.save(fileName);
-                showToast('فایل PDF با چیدمان دقیق و کامل دانلود شد!');
-            } catch (err) {
-                console.error('خطا در ساخت PDF:', err);
-                showToast('در حال باز کردن پنجره چاپ مرورگر...');
-                window.print();
-            } finally {
-                if (sandbox && sandbox.parentNode) {
-                    sandbox.parentNode.removeChild(sandbox);
-                }
-                btn.innerHTML = originalContent;
-                btn.disabled = false;
-                if (window.lucide) lucide.createIcons();
-            }
+            updateMathCanvasHeights(paper);
         }
 
         // راه‌اندازی اولیه پس از بارگذاری کامل صفحه
         window.addEventListener('DOMContentLoaded', () => {
             loadFromStorage();
+            appState.questions.forEach(normalizeQuestionImages);
             populateInputsFromState();
             renderQuestionsEditor();
             renderDescriptiveEditor();
